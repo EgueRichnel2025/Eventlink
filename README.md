@@ -1,6 +1,5 @@
 # EventLink 📌
-
-_Le conteneur d'événements pour ne plus jamais rater un lien perdu dans WhatsApp_
+*Le conteneur d'événements pour ne plus jamais rater un lien perdu dans WhatsApp*
 
 ## 🎯 Le problème
 
@@ -8,59 +7,33 @@ On est 5 dans un groupe WhatsApp. On partage des liens d'opportunités (hackatho
 
 ## 💡 La solution
 
-Une app où on colle le lien une seule fois. L'app extrait automatiquement le titre, la description, l'image et la date, notifie tout le groupe en push, et garde tout organisé dans une liste avec statut (à voir / inscrit / passé).
+Une app simple : un bouton **Ajouter**, on colle le lien, on écrit une description, on ajoute une image si on en a une. L'event est visible par tout le groupe, avec une section commentaires pour en discuter directement dessus.
 
 ---
 
 ## 🧱 Stack technique
 
-| Composant              | Techno                                  |
-| ---------------------- | --------------------------------------- |
-| Frontend               | Flutter / Dart                          |
-| Backend                | FastAPI (Python)                        |
-| Base de données        | MongoDB                                 |
-| Notifications          | Firebase Cloud Messaging (FCM)          |
-| Extraction métadonnées | httpx + BeautifulSoup (Open Graph tags) |
-| Hébergement backend    | Render                                  |
+| Composant | Techno |
+|---|---|
+| Frontend | Flutter / Dart |
+| Backend | FastAPI (Python) |
+| Base de données | MongoDB |
+| Notifications | Firebase Cloud Messaging (FCM) |
+| Stockage image | à définir (Firebase Storage ou Cloudinary) |
+| Hébergement backend | Render |
 
 ---
 
-## 🗂️ Structure du projet
+## 🔄 Fonctionnement (V1 simplifiée)
 
-Le projet est en **monorepo** : frontend Flutter et backend FastAPI vivent dans le même dossier `eventlink/`, sur le même repo GitHub.
+1. Un membre appuie sur **Ajouter**
+2. Il remplit : lien (obligatoire), description (obligatoire), image (optionnelle)
+3. L'event est créé et visible par tout le groupe
+4. Tout le monde reçoit une notification push
+5. Chacun peut changer son statut (à voir / inscrit / passé) sur l'event
+6. Une section **commentaires** sous chaque event permet d'en discuter
 
-```
-eventlink/
-├── README.md
-├── .gitignore
-├── pubspec.yaml                  # config Flutter
-│
-├── lib/                          # 📱 FRONTEND FLUTTER
-│   ├── main.dart
-│   ├── config/
-│   ├── models/
-│   ├── services/
-│   ├── providers/
-│   ├── screens/
-│   └── widgets/
-│
-├── android/ ios/ web/ ...        # dossiers générés par Flutter (ne pas toucher)
-│
-└── eventlink_backend/            # ⚙️ BACKEND FASTAPI
-    ├── main.py
-    ├── requirements.txt
-    ├── .env                      # jamais sur GitHub
-    ├── .env.example
-    ├── firebase-credentials.json # jamais sur GitHub
-    └── app/
-        ├── config.py
-        ├── database.py
-        ├── models/
-        ├── schemas/
-        ├── routes/
-        ├── services/
-        └── utils/
-```
+Pas d'extraction automatique des infos du lien pour l'instant — c'est le membre qui remplit lui-même. Plus simple à développer et à comprendre pour tout le monde. L'extraction auto (Open Graph) reste possible plus tard (V2), pas bloquante pour commencer.
 
 ---
 
@@ -68,90 +41,72 @@ eventlink/
 
 ### ⚙️ Backend — `eventlink_backend/`
 
-| Fichier                        | Rôle                                                                                     |
-| ------------------------------ | ---------------------------------------------------------------------------------------- |
-| `main.py`                      | Point d'entrée de l'API. Lance le serveur FastAPI et connecte toutes les routes.         |
-| `requirements.txt`             | Liste des librairies Python nécessaires au projet.                                       |
-| `.env`                         | Contient les infos sensibles (URI MongoDB, clés). **Ne jamais commit.**                  |
-| `.env.example`                 | Modèle du `.env` — montre quelles variables remplir, sans les vraies valeurs.            |
-| `firebase-credentials.json`    | Clé secrète pour envoyer les notifications via Firebase. **Ne jamais commit.**           |
-| `app/config.py`                | Lit les variables du `.env` et les rend utilisables dans le code.                        |
-| `app/database.py`              | Gère la connexion à la base MongoDB.                                                     |
-| `app/models/user.py`           | Décrit à quoi ressemble un utilisateur en base (nom, email, token de notif...).          |
-| `app/models/groupe.py`         | Décrit un groupe (nom, code d'invitation, liste des membres).                            |
-| `app/models/event.py`          | Décrit un event (lien, titre extrait, image, date, statut par membre).                   |
-| `app/schemas/user_schema.py`   | Définit ce que l'API accepte/renvoie pour un utilisateur (validation).                   |
-| `app/schemas/groupe_schema.py` | Idem pour les groupes.                                                                   |
-| `app/schemas/event_schema.py`  | Idem pour les events.                                                                    |
-| `app/routes/auth_routes.py`    | Endpoints pour se connecter / rejoindre un groupe via code.                              |
-| `app/routes/groupe_routes.py`  | Endpoints pour créer/consulter un groupe.                                                |
-| `app/routes/event_routes.py`   | Endpoints pour ajouter un lien, lister les events, changer un statut.                    |
-| `app/services/og_scraper.py`   | Le cœur technique : va chercher automatiquement titre/image/description d'un lien collé. |
-| `app/services/fcm_service.py`  | Envoie les notifications push à tous les membres du groupe.                              |
-| `app/services/auth_service.py` | Logique de vérification (mot de passe, code d'invitation valide...).                     |
-| `app/utils/security.py`        | Fonctions utilitaires : hash de mot de passe, génération de code aléatoire.              |
+| Fichier | Rôle |
+|---|---|
+| `main.py` | Point d'entrée de l'API. Lance le serveur FastAPI et connecte toutes les routes. |
+| `requirements.txt` | Liste des librairies Python nécessaires. |
+| `.env` | Infos sensibles (URI MongoDB, clés). **Ne jamais commit.** |
+| `.env.example` | Modèle du `.env` sans les vraies valeurs. |
+| `firebase-credentials.json` | Clé secrète pour les notifications Firebase. **Ne jamais commit.** |
+| `app/config.py` | Lit les variables du `.env`. |
+| `app/database.py` | Connexion à MongoDB. |
+| `app/models/user.py` | Structure d'un utilisateur en base. |
+| `app/models/groupe.py` | Structure d'un groupe (nom, code d'invitation, membres). |
+| `app/models/event.py` | Structure d'un event : lien, description, image, statuts, **commentaires**. |
+| `app/schemas/user_schema.py` | Validation des données utilisateur pour l'API. |
+| `app/schemas/groupe_schema.py` | Validation des données groupe. |
+| `app/schemas/event_schema.py` | Validation des events **et des commentaires**. |
+| `app/routes/auth_routes.py` | Connexion / rejoindre un groupe via code. |
+| `app/routes/groupe_routes.py` | Créer/consulter un groupe. |
+| `app/routes/event_routes.py` | Créer un event, lister, changer statut, **ajouter un commentaire**. |
+| `app/services/og_scraper.py` | *(optionnel, V2)* extraction auto — pas utilisé en V1. |
+| `app/services/fcm_service.py` | Envoie les notifications push. |
+| `app/services/auth_service.py` | Vérification connexion / code d'invitation. |
+| `app/utils/security.py` | Hash mot de passe, génération de code. |
 
 ### 📱 Frontend — `lib/`
 
-| Fichier                                   | Rôle                                                                      |
-| ----------------------------------------- | ------------------------------------------------------------------------- |
-| `main.dart`                               | Point d'entrée de l'application Flutter.                                  |
-| `config/theme.dart`                       | Couleurs, polices, style visuel global de l'app.                          |
-| `config/constants.dart`                   | Valeurs fixes : URL du backend, clés partagées.                           |
-| `models/user_model.dart`                  | Structure d'un utilisateur côté app (miroir du modèle backend).           |
-| `models/groupe_model.dart`                | Structure d'un groupe côté app.                                           |
-| `models/event_model.dart`                 | Structure d'un event côté app.                                            |
-| `services/api_service.dart`               | Centralise tous les appels HTTP vers le backend FastAPI.                  |
-| `services/auth_service.dart`              | Gère la connexion et la session utilisateur.                              |
-| `services/notification_service.dart`      | Reçoit et affiche les notifications push (FCM), foreground et background. |
-| `providers/auth_provider.dart`            | Garde en mémoire l'état de connexion de l'utilisateur dans l'app.         |
-| `providers/event_provider.dart`           | Garde en mémoire la liste des events et leurs statuts.                    |
-| `screens/splash_screen.dart`              | Écran de chargement affiché au démarrage de l'app.                        |
-| `screens/auth/login_screen.dart`          | Écran de connexion.                                                       |
-| `screens/auth/join_groupe_screen.dart`    | Écran pour rejoindre un groupe via code d'invitation.                     |
-| `screens/events/event_list_screen.dart`   | Écran principal : liste de tous les events du groupe.                     |
-| `screens/events/event_detail_screen.dart` | Écran détail d'un event (infos complètes + changement de statut).         |
-| `screens/events/add_link_screen.dart`     | Écran où on colle un lien pour créer un nouvel event.                     |
-| `widgets/event_card.dart`                 | Composant réutilisable : la carte qui représente un event dans la liste.  |
-| `widgets/status_badge.dart`               | Petit badge visuel (à voir / inscrit / passé).                            |
-| `widgets/loading_indicator.dart`          | Indicateur de chargement réutilisable.                                    |
+| Fichier | Rôle |
+|---|---|
+| `main.dart` | Point d'entrée de l'app Flutter. |
+| `config/theme.dart` | Couleurs, style visuel global. |
+| `config/constants.dart` | URL backend, clés fixes. |
+| `models/user_model.dart` | Structure utilisateur côté app. |
+| `models/groupe_model.dart` | Structure groupe côté app. |
+| `models/event_model.dart` | Structure event côté app, **avec ses commentaires**. |
+| `services/api_service.dart` | Tous les appels HTTP vers le backend. |
+| `services/auth_service.dart` | Connexion / session utilisateur. |
+| `services/notification_service.dart` | Réception des notifs push (foreground/background). |
+| `providers/auth_provider.dart` | État de connexion de l'utilisateur. |
+| `providers/event_provider.dart` | Liste des events et leurs statuts en mémoire. |
+| `screens/splash_screen.dart` | Écran de chargement au démarrage. |
+| `screens/auth/login_screen.dart` | Écran de connexion. |
+| `screens/auth/join_groupe_screen.dart` | Rejoindre un groupe via code. |
+| `screens/events/event_list_screen.dart` | Liste des events + bouton **Ajouter**. |
+| `screens/events/event_detail_screen.dart` | Détail event + statut + **section commentaires**. |
+| `screens/events/add_link_screen.dart` | Formulaire : lien, description, image. |
+| `widgets/event_card.dart` | Carte d'un event dans la liste. |
+| `widgets/status_badge.dart` | Badge à voir / inscrit / passé. |
+| `widgets/loading_indicator.dart` | Indicateur de chargement. |
 
 ---
 
 ## 🗂️ Modèle de données (MongoDB)
 
 ```json
-// users
-{
-  "_id": "ObjectId",
-  "nom": "string",
-  "email": "string",
-  "fcm_token": "string",
-  "groupe_id": "ObjectId"
-}
-
-// groupes
-{
-  "_id": "ObjectId",
-  "nom": "string",
-  "code_invitation": "string",
-  "membres": ["user_id", "..."]
-}
-
 // events
 {
   "_id": "ObjectId",
   "groupe_id": "ObjectId",
-  "lien_original": "string",
-  "titre": "string",
+  "lien": "string",
   "description": "string",
-  "image_url": "string",
-  "date_detectee": "datetime | null",
+  "image_url": "string | null",
   "ajoute_par": "user_id",
   "date_ajout": "datetime",
-  "statut_membres": {
-    "user_id_1": "a_voir | inscrit | passe"
-  }
+  "statut_membres": { "user_id_1": "a_voir | inscrit | passe" },
+  "commentaires": [
+    { "user_id": "string", "texte": "string", "date": "datetime" }
+  ]
 }
 ```
 
@@ -160,71 +115,44 @@ eventlink/
 ## 🚀 Périmètre du MVP (V1)
 
 **Inclus :**
-
 - [ ] Rejoindre un groupe via code d'invitation
-- [ ] Coller un lien → extraction auto titre/description/image
-- [ ] Notification push à tout le groupe dès qu'un lien est ajouté
+- [ ] Bouton "Ajouter" → lien + description + image (optionnelle)
+- [ ] Notification push à tout le groupe
 - [ ] Liste des events avec statut par membre
-- [ ] Fiche détail d'un event
+- [ ] Section commentaires sur chaque event
 
 **Exclus (V2+) :**
-
-- Commentaires sur un event
-- Vote "je viens" collectif
-- Rappels programmés avant la date
+- Extraction automatique des infos d'un lien
+- Rappels programmés
 - Catégories / filtres avancés
 
 ---
 
-## 🛠️ Étapes de développement (ordre à suivre)
+## 🛠️ Étapes de développement
 
-1. **Backend — endpoint d'extraction**
-   Endpoint `POST /events` qui reçoit un lien, scrape les balises Open Graph (`og:title`, `og:description`, `og:image`), et enregistre en base. Tester avec Postman avant de toucher à Flutter.
-
-2. **Backend — routes CRUD complètes**
-   `GET /events`, `GET /events/{id}`, `PATCH /events/{id}/statut`, gestion groupes et membres.
-
-3. **Setup Firebase**
-   Créer le projet Firebase, activer FCM, créer un endpoint backend qui envoie une notif à tous les `fcm_token` d'un groupe.
-
-4. **App Flutter — écrans de base**
-   Écran rejoindre/créer groupe → écran liste des events → écran détail event.
-
-5. **Intégration `firebase_messaging`**
-   Réception des notifs en foreground et background, navigation vers la fiche event au tap.
-
-6. **Champ "coller un lien"**
-   Input + appel API + état de chargement pendant l'extraction + gestion d'échec (formulaire manuel de secours).
-
-7. **Statuts membres**
-   Badge visuel à voir / inscrit / passé, mise à jour via `PATCH`.
-
-8. **Déploiement**
-   Backend sur Render, build APK pour test en conditions réelles avec le groupe.
-
----
-
-## ⚠️ Points d'attention connus
-
-- Certains sites (Instagram, LinkedIn) bloquent le scraping ou n'ont pas de bonnes balises OG → prévoir un formulaire manuel de fallback.
-- Bien gérer le cas où plusieurs membres ajoutent le même lien (déduplication par URL).
-- Les `fcm_token` expirent/changent → prévoir un refresh à chaque login.
+1. Backend — CRUD events (lien, description, image)
+2. Backend — commentaires (ajouter/lister)
+3. Setup Firebase + notifications push
+4. Écrans Flutter de base (groupe → liste → détail)
+5. Formulaire d'ajout (lien/description/image)
+6. Section commentaires dans l'écran détail
+7. Intégration `firebase_messaging`
+8. Statuts membres
+9. Déploiement Render + build APK
 
 ---
 
 ## 👥 Répartition suggérée
 
-À adapter selon vos disponibilités, mais un découpage possible :
-
-- 1-2 personnes sur le backend (FastAPI + Mongo + FCM)
-- 2-3 personnes sur le Flutter (UI + intégration API + notifs)
-- Tout le monde teste en conditions réelles dans le groupe WhatsApp habituel
+- Backend (FastAPI + Mongo + FCM) : 2 personnes
+- Frontend Flutter : 2-3 personnes
+- Tests en conditions réelles sur le groupe WhatsApp
 
 ---
 
 ## 📋 Setup rapide
 
-```bash
+\`\`\`bash
 git clone https://github.com/EgueRichnel2025/Eventlink.git
 cd Eventlink
 
@@ -233,19 +161,7 @@ cd eventlink_backend
 pip install -r requirements.txt --break-system-packages
 uvicorn main:app --reload
 
-# Frontend (dans un autre terminal, à la racine du projet)
+# Frontend
 flutter pub get
 flutter run
-```
-
-Variables d'environnement à définir dans `eventlink_backend/.env` : `MONGO_URI`, `FIREBASE_CREDENTIALS`, `PORT`.
-
----
-
-## 🤝 Comment contribuer
-
-1. Clone le repo
-2. Crée une branche pour ta tâche : `git checkout -b nom/fonctionnalite`
-3. Commit régulièrement avec des messages clairs
-4. Push ta branche et ouvre une Pull Request
-5. Fais relire avant de merger sur `main`
+\`\`\`
