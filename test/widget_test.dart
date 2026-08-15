@@ -1,9 +1,9 @@
-// This is a basic Flutter widget test.
+// widget_test.dart
+// Test de base généré par Flutter, adapté à notre app EventLinkApp.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Pour l'instant ce test est un simple test de fumée (vérifie que
+// l'app démarre sans planter). À enrichir plus tard avec de vrais
+// tests une fois les écrans terminés.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,20 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:eventlink/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('EventLinkApp se lance sans erreur', (WidgetTester tester) async {
+    // Construit notre app et déclenche une frame.
+    await tester.pumpWidget(const EventLinkApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // TODO: une fois les écrans terminés, remplacer ce test basique
+    // par de vrais tests (ex: vérifier que le bouton "Ajouter" est présent
+    // sur l'écran liste, etc.)
   });
 }
