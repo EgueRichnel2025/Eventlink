@@ -6,40 +6,50 @@ génération de code d'invitation).
 Responsable suggéré : Dine
 """
 
+from passlib.hash import bcrypt
 import random
 import string
 
 
 def hasher_mot_de_passe(mot_de_passe: str) -> str:
     """
-    Transforme un mot de passe en clair en une version hashée sécurisée
-    à stocker en base (jamais stocker un mot de passe en clair).
+    Hashe un mot de passe en clair avec bcrypt (sel intégré automatiquement).
 
-    TODO:
-    - utiliser une librairie de hash sécurisée (ex: passlib avec bcrypt)
-    - retourner le hash
+    Args:
+        mot_de_passe: mot de passe en clair.
+
+    Returns:
+        Hash à stocker en base (champ mot_de_passe_hash).
     """
-    pass
+    return bcrypt.hash(mot_de_passe)
 
 
 def verifier_mot_de_passe(mot_de_passe_clair: str, mot_de_passe_hash: str) -> bool:
     """
-    Vérifie qu'un mot de passe en clair correspond bien au hash stocké.
+    Vérifie la correspondance entre un mot de passe en clair et un hash stocké.
 
-    TODO:
-    - utiliser la même librairie que hasher_mot_de_passe pour comparer
-    - retourner True si ça correspond, False sinon
+    Args:
+        mot_de_passe_clair: mot de passe saisi à la connexion.
+        mot_de_passe_hash: hash stocké en base pour l'utilisateur.
+
+    Returns:
+        True si le mot de passe est valide, False sinon.
     """
-    pass
+    return bcrypt.verify(mot_de_passe_clair, mot_de_passe_hash)
 
 
 def generer_code_invitation(longueur: int = 6) -> str:
     """
-    Génère un code d'invitation aléatoire pour un groupe (ex: "A3F9K1").
+    Génère un code d'invitation aléatoire pour un groupe.
 
-    TODO:
-    - générer une chaîne aléatoire de `longueur` caractères
-      (lettres majuscules + chiffres, voir string.ascii_uppercase + string.digits)
-    - retourner le code généré
+    Alphabet restreint (sans 0/O/1/I) pour éviter les erreurs de saisie
+    lors de la saisie manuelle du code par l'utilisateur.
+
+    Args:
+        longueur: nombre de caractères du code (défaut : 6).
+
+    Returns:
+        Code alphanumérique en majuscules, ex: "K3F9RT".
     """
-    pass
+    caracteres = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    return ''.join(random.choice(caracteres) for _ in range(longueur))

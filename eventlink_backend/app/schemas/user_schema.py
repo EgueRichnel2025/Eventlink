@@ -8,30 +8,51 @@ Responsable suggéré : Dine
 """
 
 from pydantic import BaseModel
+from typing import Optional
 
 
 class UserCreate(BaseModel):
     """
     Données attendues quand un utilisateur s'inscrit.
 
-    TODO: définir les champs attendus (nom, email, mot_de_passe)
+    Attributes:
+        nom: nom affiché de l'utilisateur.
+        email: email de connexion.
+        mot_de_passe: mot de passe en clair, hashé par
+            utils/security.hasher_mot_de_passe avant stockage.
     """
-    pass
+    nom: str
+    email: str
+    mot_de_passe: str
 
 
 class UserLogin(BaseModel):
     """
     Données attendues quand un utilisateur se connecte.
 
-    TODO: définir les champs attendus (email, mot_de_passe)
+    Attributes:
+        email: email de connexion.
+        mot_de_passe: mot de passe en clair, vérifié via
+            utils/security.verifier_mot_de_passe.
     """
-    pass
+    email: str
+    mot_de_passe: str
 
 
 class UserOut(BaseModel):
     """
     Données renvoyées par l'API pour un utilisateur (jamais le mot de passe !).
 
-    TODO: définir les champs à renvoyer (id, nom, email)
+    Attributes:
+        id: identifiant MongoDB de l'utilisateur, requis côté app pour
+            les requêtes ultérieures (ex: récupérer ses events).
+        nom: nom affiché de l'utilisateur.
+        email: email de connexion.
+        groupe_id: groupe rejoint par l'utilisateur, évite une requête
+            supplémentaire côté app pour l'obtenir. Absent tant que
+            l'utilisateur n'a rejoint aucun groupe.
     """
-    pass
+    id: str
+    nom: str
+    email: str
+    groupe_id: Optional[str] = None

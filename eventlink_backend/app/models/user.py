@@ -13,15 +13,18 @@ class User(BaseModel):
     """
     Représente un utilisateur enregistré dans l'app.
 
-    Champs à définir :
-    - nom (str) : nom affiché de l'utilisateur
-    - email (str) : email de connexion
-    - mot_de_passe_hash (str) : mot de passe stocké de façon sécurisée (jamais en clair)
-    - fcm_token (Optional[str]) : token pour recevoir les notifications push
-    - groupe_id (Optional[str]) : identifiant du groupe auquel il appartient
-
-    TODO: compléter les champs ci-dessous avec les bons types
+    Attributes:
+        nom: nom affiché de l'utilisateur.
+        email: email de connexion.
+        mot_de_passe_hash: mot de passe hashé (voir utils/security.py),
+            jamais stocké en clair.
+        fcm_token: token Firebase Cloud Messaging pour les notifications
+            push, absent tant que l'app ne l'a pas encore transmis.
+        groupe_id: identifiant du groupe rejoint, absent avant qu'un
+            utilisateur ne rejoigne un groupe via code d'invitation.
     """
-    nom: str = None       # TODO
-    email: str = None     # TODO
-    # TODO: ajouter mot_de_passe_hash, fcm_token, groupe_id
+    nom: str
+    email: str
+    mot_de_passe_hash: str
+    fcm_token: Optional[str] = None
+    groupe_id: Optional[str] = None

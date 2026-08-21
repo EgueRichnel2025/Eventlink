@@ -6,27 +6,43 @@ séparée des routes pour rester réutilisable et testable.
 Responsable suggéré : Dine
 """
 
+from app.database import get_collection
+from app.utils.security import verifier_mot_de_passe
+
 
 async def verifier_email_existe(email: str) -> bool:
     """
     Vérifie si un email est déjà utilisé par un compte existant.
 
-    TODO:
-    - chercher dans la collection "users" un document avec cet email
-    - retourner True si trouvé, False sinon
+    Args:
+        email: email à vérifier.
+
+    Returns:
+        True si un utilisateur avec cet email existe déjà, False sinon.
     """
-    pass
+    users = get_collection("users")
+    utilisateur = await users.find_one({"email": email})
+    return utilisateur is not None
 
 
 async def authentifier_utilisateur(email: str, mot_de_passe: str):
     """
     Vérifie les identifiants d'un utilisateur à la connexion.
 
-    TODO:
-    - chercher l'utilisateur par email
-    - si non trouvé, retourner None
-    - vérifier le mot de passe avec la fonction de app/utils/security.py
-    - si le mot de passe est correct, retourner l'utilisateur
-    - sinon retourner None
+    Args:
+        email: email fourni à la connexion.
+        mot_de_passe: mot de passe en clair fourni à la connexion.
+
+    Returns:
+        Le document utilisateur (dict) si les identifiants sont
+        valides, None sinon (email inconnu ou mot de passe incorrect).
     """
-    pass
+    users = get_collection("users")
+    utilisateur = await users.find_one({"email": email})
+    if utilisateur is None:
+        return None
+
+    if not verifier_mot_de_passe(mot_de_passe, utilisateur["mot_de_passe_hash"]):
+        return None
+
+    return utilisateur
