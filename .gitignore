@@ -1,0 +1,24 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.idea/
+*.iml
+.vscode/
+android/local.properties
+ios/Flutter/Flutter.podspec
+ios/Pods/
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Backend (Python)
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/.env
+backend/.venv/
+backend/venv/
+backend/.pytest_cache/
+backend/firebase-credentials.json
