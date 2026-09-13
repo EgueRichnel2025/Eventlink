@@ -133,8 +133,9 @@ class AuteurEvent {
   final String prenom;
   final String nom;
   final String? photoUrl;
+  final String? avatarId;
 
-  AuteurEvent({required this.userId, required this.prenom, required this.nom, this.photoUrl});
+  AuteurEvent({required this.userId, required this.prenom, required this.nom, this.photoUrl, this.avatarId});
 
   String get nomComplet => '$prenom $nom';
 
@@ -144,6 +145,7 @@ class AuteurEvent {
       prenom: json['prenom'] as String,
       nom: json['nom'] as String,
       photoUrl: json['photo_url'] as String?,
+      avatarId: json['avatar_id'] as String?,
     );
   }
 }
@@ -159,6 +161,9 @@ class EventModel {
   final DateTime createdAt;
   final StatutPersonnel? monStatut;
   final int nombreCommentaires;
+  final int vues; // Number of views
+  final Map<String, int> reactions; // Reaction type -> count
+  final String? userReaction; // Current user's reaction type (if any)
 
   EventModel({
     required this.id,
@@ -171,6 +176,9 @@ class EventModel {
     required this.createdAt,
     this.monStatut,
     required this.nombreCommentaires,
+    required this.vues,
+    required this.reactions,
+    this.userReaction,
   });
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
@@ -185,10 +193,20 @@ class EventModel {
       createdAt: DateTime.parse(json['created_at'] as String),
       monStatut: StatutPersonnel.fromString(json['mon_statut'] as String?),
       nombreCommentaires: json['nombre_commentaires'] as int? ?? 0,
+      vues: json['vues'] as int? ?? 0,
+      reactions: (json['reactions'] as Map<String, dynamic>?)
+              ?.map((key, value) => MapEntry(key, value as int))
+              ?? const {},
+      userReaction: json['user_reaction'] as String?,
     );
   }
 
-  EventModel copyWith({StatutPersonnel? monStatut}) {
+  EventModel copyWith({
+    StatutPersonnel? monStatut,
+    int? vues,
+    Map<String, int>? reactions,
+    String? userReaction,
+  }) {
     return EventModel(
       id: id,
       groupId: groupId,
@@ -200,6 +218,9 @@ class EventModel {
       createdAt: createdAt,
       monStatut: monStatut ?? this.monStatut,
       nombreCommentaires: nombreCommentaires,
+      vues: vues ?? this.vues,
+      reactions: reactions ?? this.reactions,
+      userReaction: userReaction ?? this.userReaction,
     );
   }
 }

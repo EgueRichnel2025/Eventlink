@@ -5,6 +5,7 @@ class CommentModel {
   final String prenom;
   final String nom;
   final String? photoUrl;
+  final String? avatarId;
   final String texte;
   final DateTime createdAt;
 
@@ -15,6 +16,7 @@ class CommentModel {
     required this.prenom,
     required this.nom,
     this.photoUrl,
+    this.avatarId,
     required this.texte,
     required this.createdAt,
   });
@@ -29,8 +31,21 @@ class CommentModel {
       prenom: json['prenom'] as String,
       nom: json['nom'] as String,
       photoUrl: json['photo_url'] as String?,
+      avatarId: json['avatar_id'] as String?,
       texte: json['texte'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        '_id': id,
+        'event_id': eventId,
+        'user_id': userId,
+        'prenom': prenom,
+        'nom': nom,
+        'photo_url': photoUrl,
+        'avatar_id': avatarId,
+        'texte': texte,
+        'created_at': createdAt.toIso8601String(),
+      };
 }
