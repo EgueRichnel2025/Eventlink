@@ -84,12 +84,14 @@ void main() {
         'created_at': '2026-01-01T10:00:00Z',
         'mon_statut': 'inscrit',
         'nombre_commentaires': 2,
+        'vues': 5,
       };
       final event = EventModel.fromJson(json);
 
       expect(event.categorie, CategorieEvent.hackathon);
       expect(event.monStatut, StatutPersonnel.inscrit);
       expect(event.auteur.nomComplet, 'Richnel EGUE');
+      expect(event.vues, 5);
     });
 
     test('copyWith met à jour uniquement le statut', () {
@@ -104,6 +106,7 @@ void main() {
         'created_at': '2026-01-01T10:00:00Z',
         'mon_statut': null,
         'nombre_commentaires': 0,
+        'vues': 0,
       };
       final event = EventModel.fromJson(json);
       final misAJour = event.copyWith(monStatut: StatutPersonnel.passe);
@@ -111,6 +114,7 @@ void main() {
       expect(misAJour.monStatut, StatutPersonnel.passe);
       expect(misAJour.id, event.id);
       expect(misAJour.description, event.description);
+      expect(misAJour.vues, event.vues);
     });
   });
 }

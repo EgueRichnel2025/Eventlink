@@ -16,13 +16,14 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.utils.security import create_access_token, create_refresh_token, hash_token, decode_token, JWTError
 
 
-async def creer_profil(db: AsyncIOMotorDatabase, prenom: str, nom: str) -> dict:
+async def creer_profil(db: AsyncIOMotorDatabase, prenom: str, nom: str, avatar_id: str = "avatar_01") -> dict:
     now = datetime.now(timezone.utc)
     result = await db.users.insert_one(
         {
             "prenom": prenom.strip(),
             "nom": nom.strip(),
             "photo_url": None,
+            "avatar_id": avatar_id,
             "fcm_token": None,
             "created_at": now,
         }

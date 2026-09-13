@@ -67,3 +67,21 @@ async def require_group_member(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Vous n'êtes pas membre de ce groupe")
 
     return membership
+
+
+async def require_group_admin(
+    membership: dict = Depends(require_group_member),
+) -> dict:
+    """Vérifie que l'utilisateur courant est administrateur ou propriétaire du groupe."""
+    if membership["role"] not in ("admin", "owner"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Seuls les administrateurs ou le propriétaire peuvent accéder à cette ressource")
+    return membership
+
+
+async def require_group_owner(
+    membership: dict = Depends(require_group_member),
+) -> dict:
+    """Vérifie que l'utilisateur courant est propriétaire du groupe."""
+    if membership["role"] != "owner":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Seul le propriétaire peut accéder à cette ressource")
+    return membership

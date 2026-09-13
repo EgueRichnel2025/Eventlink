@@ -30,7 +30,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
     final evenementsParJour = <DateTime, int>{};
     for (final e in events) {
-      final jour = DateTime(e.createdAt.year, e.createdAt.month, e.createdAt.day);
+      final jour = DateTime(
+        e.createdAt.year,
+        e.createdAt.month,
+        e.createdAt.day,
+      );
       evenementsParJour[jour] = (evenementsParJour[jour] ?? 0) + 1;
     }
 
@@ -50,7 +54,8 @@ class _CalendarScreenState extends State<CalendarScreen> {
             firstDay: DateTime.now().subtract(const Duration(days: 365)),
             lastDay: DateTime.now().add(const Duration(days: 365)),
             focusedDay: _jourFocus,
-            selectedDayPredicate: (day) => isSameDay(_jourSelectionne, day),
+            selectedDayPredicate: (day) =>
+                isSameDay(_jourSelectionne, day),
             onDaySelected: (selectionne, focus) {
               setState(() {
                 _jourSelectionne = selectionne;
@@ -63,30 +68,66 @@ class _CalendarScreenState extends State<CalendarScreen> {
               return List.filled(count, null);
             },
             calendarStyle: const CalendarStyle(
-              selectedDecoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-              todayDecoration: BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
-              markerDecoration: BoxDecoration(color: AppColors.primaryDark, shape: BoxShape.circle),
+              selectedDecoration: BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+              todayDecoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                shape: BoxShape.circle,
+              ),
+              markerDecoration: BoxDecoration(
+                color: AppColors.primaryDark,
+                shape: BoxShape.circle,
+              ),
             ),
-            headerStyle: const HeaderStyle(formatButtonVisible: false, titleCentered: true),
+            headerStyle: const HeaderStyle(
+              formatButtonVisible: false,
+              titleCentered: true,
+            ),
           ),
           const Divider(height: 1),
           Expanded(
             child: evenementsDuJour.isEmpty
                 ? Center(
-                    child: Text('Aucun événement ce jour-là', style: Theme.of(context).textTheme.bodyMedium),
+                    child: Text(
+                      'Aucun événement ce jour-là',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                   )
                 : ListView.separated(
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     itemCount: evenementsDuJour.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: AppSpacing.sm),
                     itemBuilder: (context, index) {
                       final e = evenementsDuJour[index];
+
                       return Card(
                         child: ListTile(
-                          leading: Text(e.categorie.emoji, style: const TextStyle(fontSize: 22)),
-                          title: Text(e.description, maxLines: 2, overflow: TextOverflow.ellipsis),
+                          leading: Text(
+                            e.categorie.emoji,
+                            style: const TextStyle(fontSize: 22),
+                          ),
+                          title: Text(
+                            e.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           subtitle: Text(e.auteur.nomComplet),
-                          onTap: () => Navigator.of(context).pushNamed(AppRoutes.eventDetail, arguments: e.id),
+                          onTap: () async {
+                            final eventsProvider =
+                                context.read<EventProvider>();
+                            final navigator = Navigator.of(context);
+                            await eventsProvider.incrVues(e.id);
+
+                            if (!mounted) return;
+
+                            navigator.pushNamed(
+                              AppRoutes.eventDetail,
+                              arguments: e.id,
+                            );
+                          },
                         ),
                       );
                     },

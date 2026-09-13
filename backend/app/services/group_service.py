@@ -84,23 +84,41 @@ async def obtenir_groupe(db: AsyncIOMotorDatabase, group_id: ObjectId, user_id: 
     return groupe
 
 
-async def lister_membres(db: AsyncIOMotorDatabase, group_id: ObjectId) -> list[dict]:
+async def lister_membres(
+    db: AsyncIOMotorDatabase,
+    group_id: ObjectId,
+    recherche: str | None = None,
+    ) -> list[dict]:
     memberships = await db.group_members.find({"group_id": group_id}).to_list(length=None)
+
     membres = []
+
     for m in memberships:
         user = await db.users.find_one({"_id": m["user_id"]})
+
         if user is None:
             continue
+
+        if recherche and recherche.strip():
+            terme = recherche.strip().lower()
+            prenom = user.get("prenom", "").lower()
+            nom = user.get("nom", "").lower()
+
+            if terme not in prenom and terme not in nom:
+                continue
+
         membres.append(
             {
                 "user_id": user["_id"],
                 "prenom": user["prenom"],
                 "nom": user["nom"],
                 "photo_url": user.get("photo_url"),
+                "avatar_id": user.get("avatar_id"),
                 "role": m["role"],
                 "joined_at": m["joined_at"],
             }
         )
+
     return membres
 
 
@@ -112,6 +130,84 @@ async def modifier_groupe(db: AsyncIOMotorDatabase, group_id: ObjectId, updates:
 
 async def retirer_membre(db: AsyncIOMotorDatabase, group_id: ObjectId, target_user_id: ObjectId) -> None:
     await db.group_members.delete_one({"group_id": group_id, "user_id": target_user_id})
+
+
+async def transferer_propriete(db: AsyncIOMotorDatabase, group_id: ObjectId, owner_id: ObjectId, new_owner_id: ObjectId) -> None:
+    """Transfère la propriété d'un groupe à un autre membre."""
+    # Vérifier que l'utilisateur actuel est bien le propriétaire
+    membership = await db.group_members.find_one({"group_id": group_id, "user_id": owner_id})
+    if membership is None or membership["role"] != "owner":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Seul le propriétaire peut transférer la propriété")
+
+    # Vérifier que le nouveau propriétaire est bien membre du groupe
+    new_owner_membership = await db.group_members.find_one({"group_id": group_id, "user_id": new_owner_id})
+    if new_owner_membership is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "L'utilisateur cible n'est pas membre du groupe")
+
+    # Mettre à jour le propriétaire dans le groupe
+    await db.groups.update_one({"_id": group_id}, {"$set": {"owner_id": new_owner_id}})
+
+    # Changer le rôle de l'ancien propriétaire en admin
+    await db.group_members.update_one(
+        {"group_id": group_id, "user_id": owner_id},
+        {"$set": {"role": "admin"}}
+    )
+
+    # Changer le rôle du nouveau propriétaire en owner
+    await db.group_members.update_one(
+        {"group_id": group_id, "user_id": new_owner_id},
+        {"$set": {"role": "owner"}}
+    )
+
+
+async def promover_admin(db: AsyncIOMotorDatabase, group_id: ObjectId, admin_id: ObjectId, promoter_id: ObjectId) -> None:
+    """Promouvoir un membre en administrateur."""
+    # Vérifier que l'utilisateur qui promeut est propriétaire ou admin
+    promoter_membership = await db.group_members.find_one({"group_id": group_id, "user_id": promoter_id})
+    if promoter_membership is None or promoter_membership["role"] not in ("owner", "admin"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Seuls le propriétaire ou un administrateur peuvent promouvoir des admins")
+
+    # Vérifier que la cible est bien membre du groupe
+    target_membership = await db.group_members.find_one({"group_id": group_id, "user_id": admin_id})
+    if target_membership is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "L'utilisateur cible n'est pas membre du groupe")
+
+    # Ne pas permettre de promouvoir quelqu'un qui est déjà admin ou owner
+    if target_membership["role"] in ("owner", "admin"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "L'utilisateur est déjà administrateur ou propriétaire")
+
+    # Promouvoir en admin
+    await db.group_members.update_one(
+        {"group_id": group_id, "user_id": admin_id},
+        {"$set": {"role": "admin"}}
+    )
+
+
+async def retroceder_admin(db: AsyncIOMotorDatabase, group_id: ObjectId, admin_id: ObjectId, promoter_id: ObjectId) -> None:
+    """Rétrograder un administrateur en membre."""
+    # Vérifier que l'utilisateur qui rétrograde est propriétaire
+    promoter_membership = await db.group_members.find_one({"group_id": group_id, "user_id": promoter_id})
+    if promoter_membership is None or promoter_membership["role"] != "owner":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Seul le propriétaire peut rétrograder un administrateur")
+
+    # Vérifier que la cible est bien admin du groupe
+    target_membership = await db.group_members.find_one({"group_id": group_id, "user_id": admin_id})
+    if target_membership is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "L'utilisateur cible n'est pas membre du groupe")
+
+    # Ne pas permettre de rétrograder le propriétaire
+    if target_membership["role"] == "owner":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Impossible de rétrograder le propriétaire du groupe")
+
+    # Ne pas permettre de rétrograder quelqu'un qui n'est pas admin
+    if target_membership["role"] != "admin":
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "L'utilisateur n'est pas administrateur")
+
+    # Rétrograder en membre
+    await db.group_members.update_one(
+        {"group_id": group_id, "user_id": admin_id},
+        {"$set": {"role": "member"}}
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -59,14 +59,24 @@ class EventCard extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 12,
-                    backgroundColor: AppColors.primarySurface,
-                    child: Text(
-                      event.auteur.prenom.isNotEmpty ? event.auteur.prenom[0].toUpperCase() : '?',
-                      style: const TextStyle(fontSize: 11, color: AppColors.primaryDark, fontWeight: FontWeight.w700),
-                    ),
-                  ),
+                  event.auteur.avatarId != null && event.auteur.avatarId!.isNotEmpty
+                      ? CircleAvatar(
+                          radius: 12,
+                          backgroundImage: AssetImage('assets/images/avatars/${event.auteur.avatarId}.jpeg'),
+                        )
+                      : event.auteur.photoUrl != null && event.auteur.photoUrl!.isNotEmpty
+                          ? CircleAvatar(
+                              radius: 12,
+                              backgroundImage: NetworkImage(event.auteur.photoUrl!),
+                            )
+                          : CircleAvatar(
+                              radius: 12,
+                              backgroundColor: AppColors.primarySurface,
+                              child: Text(
+                                event.auteur.prenom.isNotEmpty ? event.auteur.prenom[0].toUpperCase() : '?',
+                                style: const TextStyle(fontSize: 11, color: AppColors.primaryDark, fontWeight: FontWeight.w700),
+                              ),
+                            ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(

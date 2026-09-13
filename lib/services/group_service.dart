@@ -30,8 +30,13 @@ class GroupService {
     return GroupeModel.fromJson(data);
   }
 
-  Future<List<MembreGroupeModel>> lisMembres(String groupId) async {
-    final data = await _api.get('/groupes/$groupId/membres') as List<dynamic>;
+  Future<List<MembreGroupeModel>> lisMembres(String groupId, {String? recherche}) async {
+    final data = await _api.get(
+      '/groupes/$groupId/membres',
+      query: {
+        if (recherche != null && recherche.isNotEmpty) 'q': recherche,
+      },
+    ) as List<dynamic>;
     return data.map((m) => MembreGroupeModel.fromJson(m as Map<String, dynamic>)).toList();
   }
 
@@ -47,5 +52,32 @@ class GroupService {
 
   Future<void> retirerMembre(String groupId, String userId) async {
     await _api.delete('/groupes/$groupId/membres/$userId');
+  }
+
+  Future<void> transfererPropriete(String groupId, String currentOwnerId, String newOwnerId) async {
+    await _api.post(
+      '/groupes/$groupId/transfer-ownership',
+      body: {
+        'new_owner_id': newOwnerId,
+      },
+    );
+  }
+
+  Future<void> promouvoirAdmin(String groupId, String userIdToPromote, String currentOwnerId) async {
+    await _api.post(
+      '/groupes/$groupId/promote-admin',
+      body: {
+        'admin_id': userIdToPromote,
+      },
+    );
+  }
+
+  Future<void> retrocederAdmin(String groupId, String userIdToDemote, String currentOwnerId) async {
+    await _api.post(
+      '/groupes/$groupId/demote-admin',
+      body: {
+        'admin_id': userIdToDemote,
+      },
+    );
   }
 }

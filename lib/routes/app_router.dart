@@ -12,6 +12,7 @@ import '../screens/notifications/notifications_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/auth/profil_setup_screen.dart';
+import '../screens/onboarding/onboarding_screen.dart';
 import 'app_routes.dart';
 
 /// Génère les routes nommées de l'application.
@@ -26,6 +27,8 @@ class AppRouter {
     switch (settings.name) {
       case AppRoutes.splash:
         return _page(const SplashScreen());
+      case AppRoutes.onboarding:
+        return _page(const OnboardingScreen());
       case AppRoutes.profilSetup:
         return _page(const ProfilSetupScreen());
       case AppRoutes.groupeChoice:

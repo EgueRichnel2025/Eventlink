@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../routes/app_routes.dart';
-import '../../services/storage_service.dart';
 
 class ProfilSetupScreen extends StatefulWidget {
   const ProfilSetupScreen({super.key});
@@ -57,9 +56,11 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/backgrounds/profile_background.png'),
+            image: AssetImage(
+              'assets/images/backgrounds/profile_background.jpeg',
+            ),
             fit: BoxFit.cover,
           ),
         ),
@@ -82,7 +83,7 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
                         width: 80,
                         height: 80,
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
+                          gradient:const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
@@ -99,7 +100,7 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
                             ),
                           ],
                         ),
-                        child: Center(
+                        child: const Center(
                           child: Icon(
                             Icons.person_rounded,
                             size: 36,
@@ -110,71 +111,85 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
                       const SizedBox(height: AppSpacing.lg),
                       Text(
                         'Faisons connaissance',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         'Ces informations identifieront vos événements et vos commentaires auprès des autres membres.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.9),
-                        ),
+                        style:
+                            Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: AppSpacing.xl),
+
                       // Avatar selection section
                       Column(
                         children: [
                           Text(
                             'Choisissez votre avatar',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                            ),
+                            style:
+                                Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      color: Colors.white,
+                                    ),
                           ),
                           const SizedBox(height: AppSpacing.sm),
+
                           // Utiliser mes initiales option
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: Radio<bool>(
-                              value: true,
-                              groupValue: _useInitials,
-                              onChanged: (value) {
-                                setState(() {
-                                  _useInitials = value!;
-                                  _selectedAvatarId = null; // Clear avatar selection when using initials
-                                });
-                              },
-                              activeColor: AppColors.primary,
-                            ),
-                            title: const Text(
-                              'Utiliser mes initiales',
-                              style: TextStyle(color: Colors.white),
+                          RadioGroup<bool>(
+                            groupValue: _useInitials,
+                            onChanged: (value) {
+                              if (value == null) return;
+
+                              setState(() {
+                                _useInitials = value;
+                                _selectedAvatarId = null;
+                              });
+                            },
+                            child: const ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Radio<bool>(
+                                value: true,
+                                activeColor: AppColors.primary,
+                              ),
+                              title: Text(
+                                'Utiliser mes initiales',
+                                style: TextStyle(color: Colors.white),
+                              ),
                             ),
                           ),
+
                           const SizedBox(height: AppSpacing.sm),
+
                           // Avatar grid (only show when not using initials)
                           if (!_useInitials) ...[
                             SizedBox(
                               height: 220,
                               child: GridView.builder(
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 6, // 6 columns for better display
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 6,
                                   crossAxisSpacing: 8,
                                   mainAxisSpacing: 8,
                                 ),
                                 itemCount: 66,
                                 itemBuilder: (context, index) {
                                   final avatarNumber = index + 1;
-                                  final avatarId = 'avatar_${avatarNumber.toString().padLeft(2, '0')}';
-                                  final isSelected = avatarId == _selectedAvatarId;
+                                  final avatarId =
+                                      'avatar_${avatarNumber.toString().padLeft(2, '0')}';
+                                  final isSelected =
+                                      avatarId == _selectedAvatarId;
 
                                   return GestureDetector(
                                     onTap: () {
                                       setState(() {
                                         _selectedAvatarId = avatarId;
-                                        _useInitials = false; // Ensure we're in avatar mode
+                                        _useInitials = false;
                                       });
                                     },
                                     child: Container(
@@ -188,7 +203,9 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
                                         borderRadius: BorderRadius.circular(8),
                                         color: isSelected
                                             ? AppColors.primarySurface
-                                            : Colors.white.withValues(alpha: 0.1),
+                                            : Colors.white.withValues(
+                                                alpha: 0.1,
+                                              ),
                                       ),
                                       child: Stack(
                                         children: [
@@ -233,6 +250,7 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
                           ],
                         ],
                       ),
+
                       // Name fields
                       TextFormField(
                         controller: _prenomController,
@@ -276,6 +294,7 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
                             : null,
                       ),
                       const Spacer(),
+
                       // Continue button
                       SizedBox(
                         width: double.infinity,
@@ -284,7 +303,9 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+                            padding: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.md,
+                            ),
                           ),
                           child: _isLoading
                               ? const SizedBox(

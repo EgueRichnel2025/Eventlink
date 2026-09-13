@@ -1,10 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/theme.dart';
 import '../../models/event_model.dart';
 import '../../providers/event_provider.dart';
 import '../../providers/group_provider.dart';
+import '../../services/storage_service.dart';
 
 class CreateEventScreen extends StatefulWidget {
   const CreateEventScreen({super.key});
@@ -17,106 +21,467 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   final _formKey = GlobalKey<FormState>();
   final _lienController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _imageUrlController = TextEditingController();
+
+  final ImagePicker _imagePicker = ImagePicker();
+
   CategorieEvent _categorie = CategorieEvent.autre;
+  File? _image;
+  String? _imageUrl;
   bool _enCours = false;
+  bool _isUploading = false;
 
   @override
   void dispose() {
     _lienController.dispose();
     _descriptionController.dispose();
-    _imageUrlController.dispose();
     super.dispose();
+  }
+
+  Future<void> _choisirImage() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1600,
+      );
+
+      if (image == null) return;
+
+      setState(() {
+        _image = File(image.path);
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de sélectionner cette image.'),
+        ),
+      );
+    }
+  }
+
+  Future<String?> _uploaderImage() async {
+    if (_image == null) return null;
+
+    setState(() => _isUploading = true);
+
+    try {
+      final storageService = context.read<StorageService>();
+
+      final response = await storageService.uploadFile(
+        '/events/upload',
+        file: _image!,
+        fieldName: 'file',
+      ) as Map<String, dynamic>;
+
+      if (!mounted) return null;
+
+      if (response['success'] == true && response['image_url'] != null) {
+        setState(() => _isUploading = false);
+        return response['image_url'] as String;
+      } else {
+        setState(() => _isUploading = false);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Erreur lors de l\'upload de l\'image: ${response['message']}',
+            ),
+          ),
+        );
+
+        return null;
+      }
+    } catch (e) {
+      if (!mounted) return null;
+
+      setState(() => _isUploading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de l\'upload de l\'image: $e'),
+        ),
+      );
+
+      return null;
+    }
   }
 
   Future<void> _publier() async {
     if (!_formKey.currentState!.validate()) return;
 
     final groupId = context.read<GroupProvider>().groupeCourant?.id;
-    if (groupId == null) return;
+
+    if (groupId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Aucun groupe sélectionné')),
+      );
+      return;
+    }
 
     setState(() => _enCours = true);
+
+    if (_image != null) {
+      final uploadedUrl = await _uploaderImage();
+
+      if (!mounted) return;
+
+      if (uploadedUrl != null) {
+        _imageUrl = uploadedUrl;
+      }
+    }
+
     final events = context.read<EventProvider>();
+
     final succes = await events.creerEvent(
       groupId: groupId,
       lien: _lienController.text.trim(),
       description: _descriptionController.text.trim(),
-      imageUrl: _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(),
+      imageUrl: _imageUrl,
       categorie: _categorie,
     );
-    setState(() => _enCours = false);
 
     if (!mounted) return;
+
+    setState(() => _enCours = false);
 
     if (succes) {
       Navigator.of(context).pop();
     } else if (events.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(events.errorMessage!)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(events.errorMessage!)),
+      );
     }
+  }
+
+  String? _validerLien(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Le lien est obligatoire';
+    }
+
+    final uri = Uri.tryParse(value.trim());
+
+    if (uri == null ||
+        !uri.hasScheme ||
+        !['http', 'https'].contains(uri.scheme)) {
+      return 'Lien invalide (doit commencer par http/https)';
+    }
+
+    return null;
+  }
+
+  String? _validerDescription(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'La description est obligatoire';
+    }
+
+    final wordCount = value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .length;
+
+    if (wordCount < 10) {
+      return 'La description doit contenir au moins 10 mots';
+    }
+
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ajouter un événement')),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            children: [
-              Text('Catégorie', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: CategorieEvent.values.map((c) {
-                  final selectionne = _categorie == c;
-                  return ChoiceChip(
-                    label: Text('${c.emoji} ${c.label}'),
-                    selected: selectionne,
-                    onSelected: (_) => setState(() => _categorie = c),
-                  );
-                }).toList(),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.primary.withValues(alpha: 0.05),
+              AppColors.primary.withValues(alpha: 0.02),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              const SliverAppBar(
+                title: Text('Créer un événement'),
+                floating: true,
+                snap: true,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
               ),
-              const SizedBox(height: AppSpacing.lg),
-              TextFormField(
-                controller: _lienController,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(labelText: 'Lien', hintText: 'https://...'),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Le lien est obligatoire';
-                  final uri = Uri.tryParse(v.trim());
-                  if (uri == null || !uri.hasScheme) return 'Lien invalide (doit commencer par http/https)';
-                  return null;
-                },
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextFormField(
-                controller: _descriptionController,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  hintText: 'De quoi s\'agit-il ? Pourquoi est-ce intéressant ?',
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Form(
+                    key: _formKey,
+                    child: ListView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        Text(
+                          'Type d\'événement',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: CategorieEvent.values.map((c) {
+                            final selectionne = _categorie == c;
+
+                            return ChoiceChip(
+                              label: Text('${c.emoji} ${c.label}'),
+                              selected: selectionne,
+                              onSelected: (_) {
+                                setState(() => _categorie = c);
+                              },
+                              labelStyle: TextStyle(
+                                color: selectionne
+                                    ? Colors.white
+                                    : AppColors.textPrimary,
+                              ),
+                              selectedColor: AppColors.primary,
+                              side: BorderSide(
+                                color: selectionne
+                                    ? AppColors.primary
+                                    : AppColors.primary.withValues(
+                                        alpha: 0.3,
+                                      ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          'Renseigner le lien de l\'événement',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextFormField(
+                          controller: _lienController,
+                          keyboardType: TextInputType.url,
+                          decoration: const InputDecoration(
+                            labelText: 'Lien de l\'événement',
+                            hintText: 'https://example.com/evenement',
+                          ),
+                          validator: _validerLien,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          'Description de l\'événement',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextFormField(
+                          controller: _descriptionController,
+                          maxLines: 4,
+                          decoration: const InputDecoration(
+                            labelText: 'Description',
+                            hintText:
+                                'Décrivez l\'événement en détail (minimum 10 mots)',
+                          ),
+                          validator: _validerDescription,
+                          onChanged: (_) {
+                            if (_formKey.currentState != null) {
+                              _formKey.currentState!.validate();
+                            }
+                            setState(() {});
+                          },
+                        ),
+                        if (_descriptionController.text.isNotEmpty)
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(top: AppSpacing.sm),
+                            child: Text(
+                              '${_descriptionController.text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length}/10 mots minimum',
+                              style: TextStyle(
+                                color: _validerDescription(
+                                          _descriptionController.text,
+                                        ) ==
+                                        null
+                                    ? AppColors.success
+                                    : AppColors.error,
+                                fontSize: 12,
+                              ),
+                              textAlign: TextAlign.end,
+                            ),
+                          ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Text(
+                          'Ajouter l\'image de l\'événement',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        GestureDetector(
+                          onTap: _enCours ? null : _choisirImage,
+                          child: Container(
+                            height: 190,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: AppColors.primarySurface,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: _image == null
+                                ? Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.add_photo_alternate_outlined,
+                                        size: 48,
+                                        color: AppColors.primary,
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'Appuyez pour choisir une image',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              color: AppColors.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Image facultative mais recommandée',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall,
+                                      ),
+                                    ],
+                                  )
+                                : Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      Image.file(
+                                        _image!,
+                                        fit: BoxFit.cover,
+                                      ),
+                                      Positioned(
+                                        top: 10,
+                                        right: 10,
+                                        child: Material(
+                                          color: Colors.black54,
+                                          shape: const CircleBorder(),
+                                          child: InkWell(
+                                            customBorder:
+                                                const CircleBorder(),
+                                            onTap: () {
+                                              setState(() {
+                                                _image = null;
+                                                _imageUrl = null;
+                                              });
+                                            },
+                                            child: const Padding(
+                                              padding: EdgeInsets.all(8),
+                                              child: Icon(
+                                                Icons.close,
+                                                color: Colors.white,
+                                                size: 22,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        bottom: 10,
+                                        right: 10,
+                                        child: Material(
+                                          color: Colors.black54,
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          child: InkWell(
+                                            onTap: _choisirImage,
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            child: const Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 8,
+                                              ),
+                                              child: Row(
+                                                mainAxisSize:
+                                                    MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.edit,
+                                                    color: Colors.white,
+                                                    size: 18,
+                                                  ),
+                                                  SizedBox(width: 6),
+                                                  Text(
+                                                    'Changer',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (_isUploading)
+                                        const Positioned(
+                                          top: 10,
+                                          left: 10,
+                                          child: SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child:
+                                                CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _enCours ? null : _publier,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: AppSpacing.lg,
+                              ),
+                            ),
+                            child: _enCours
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Publier l\'événement',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'La description est obligatoire' : null,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextFormField(
-                controller: _imageUrlController,
-                keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: 'Image (optionnel)',
-                  hintText: 'URL d\'une image',
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              ElevatedButton(
-                onPressed: _enCours ? null : _publier,
-                child: _enCours
-                    ? const SizedBox(
-                        width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Publier'),
               ),
             ],
           ),

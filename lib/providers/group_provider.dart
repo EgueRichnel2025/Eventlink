@@ -18,6 +18,7 @@ class GroupProvider extends ChangeNotifier {
   GroupeModel? groupeCourant;
 
   List<MembreGroupeModel> membresDuGroupeCourant = [];
+String rechercheMembres = '';
 
   Future<void> chargerMesGroupes() async {
     isLoading = true;
@@ -71,10 +72,13 @@ class GroupProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> chargerMembresDuGroupeCourant() async {
+  Future<void> chargerMembresDuGroupeCourant({String? recherche}) async {
     if (groupeCourant == null) return;
     try {
-      membresDuGroupeCourant = await _groupService.lisMembres(groupeCourant!.id);
+      membresDuGroupeCourant = await _groupService.lisMembres(
+        groupeCourant!.id,
+        recherche: recherche ?? rechercheMembres,
+      );
       notifyListeners();
     } on ApiException catch (e) {
       errorMessage = e.message;
@@ -93,6 +97,19 @@ class GroupProvider extends ChangeNotifier {
       errorMessage = e.message;
       notifyListeners();
       return false;
+    }
+  }
+
+  void definirRechercheMembres(String recherche) {
+    rechercheMembres = recherche;
+    notifyListeners();
+  }
+
+  void mettreAJourGroupeDansListe(GroupeModel groupeMisAJour) {
+    final index = groupes.indexWhere((g) => g.id == groupeMisAJour.id);
+    if (index != -1) {
+      groupes[index] = groupeMisAJour;
+      notifyListeners();
     }
   }
 }

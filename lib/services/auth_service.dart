@@ -6,17 +6,23 @@ class AuthService {
   final ApiService _api;
   final StorageService _storage;
 
-  AuthService({ApiService? api, StorageService? storage})
-      : _api = api ?? ApiService(),
+  AuthService({
+    ApiService? api,
+    StorageService? storage,
+  })  : _api = api ?? ApiService(),
         _storage = storage ?? StorageService();
 
   /// Crée le profil (première utilisation) et persiste la session.
-  Future<UserModel> creerProfil({required String prenom, required String nom, String? avatarId}) async {
+  Future<UserModel> creerProfil({
+    required String prenom,
+    required String nom,
+    String? avatarId,
+  }) async {
     final data = await _api.post(
       '/auth/profil',
       body: {
-        if (prenom != null) 'prenom': prenom,
-        if (nom != null) 'nom': nom,
+        'prenom': prenom,
+        'nom': nom,
         if (avatarId != null) 'avatar_id': avatarId,
       },
       auth: false,
@@ -27,7 +33,9 @@ class AuthService {
       refreshToken: data['refresh_token'] as String,
     );
 
-    return UserModel.fromJson(data['user'] as Map<String, dynamic>);
+    return UserModel.fromJson(
+      data['user'] as Map<String, dynamic>,
+    );
   }
 
   Future<UserModel> monProfil() async {
@@ -35,7 +43,12 @@ class AuthService {
     return UserModel.fromJson(data);
   }
 
-  Future<UserModel> modifierProfil({String? prenom, String? nom, String? photoUrl, String? avatarId}) async {
+  Future<UserModel> modifierProfil({
+    String? prenom,
+    String? nom,
+    String? photoUrl,
+    String? avatarId,
+  }) async {
     final data = await _api.put(
       '/auth/moi',
       body: {
@@ -45,6 +58,7 @@ class AuthService {
         if (avatarId != null) 'avatar_id': avatarId,
       },
     ) as Map<String, dynamic>;
+
     return UserModel.fromJson(data);
   }
 

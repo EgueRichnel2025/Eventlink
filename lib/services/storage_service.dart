@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
 
 /// Stockage local sécurisé de la session (tokens) et préférences utilisateur.
 ///
@@ -13,29 +14,48 @@ class StorageService {
   /// Creates a [StorageService] with an optional [FlutterSecureStorage] instance.
   /// If [storage] is null, a new FlutterSecureStorage instance will be created.
   StorageService({FlutterSecureStorage? storage})
-      : _storage = storage ?? FlutterSecureStorage();
+      : _storage = storage ?? const FlutterSecureStorage();
 
   // Clés pour les tokens (sécurisé)
   static const _keyAccessToken = 'access_token';
   static const _keyRefreshToken = 'refresh_token';
 
   // Clés pour les préférences (non sensibles)
-  static const _keyHasCompletedOnboarding = 'has_completed_onboarding';
-  static const _keyThemePreference = 'theme_preference'; // 'light', 'dark', 'system'
-  static const _keyLanguageCode = 'language_code'; // ex: 'fr', 'en'
-  static const _keyNotificationsEnabled = 'notifications_enabled';
+  static const _keyHasCompletedOnboarding =
+      'has_completed_onboarding';
+  static const _keyThemePreference =
+      'theme_preference'; // 'light', 'dark', 'system'
+  static const _keyLanguageCode =
+      'language_code'; // ex: 'fr', 'en'
+  static const _keyNotificationsEnabled =
+      'notifications_enabled';
 
-  Future<void> saveTokens({required String accessToken, required String refreshToken}) async {
-    await _storage.write(key: _keyAccessToken, value: accessToken);
-    await _storage.write(key: _keyRefreshToken, value: refreshToken);
+  Future<void> saveTokens({
+    required String accessToken,
+    required String refreshToken,
+  }) async {
+    await _storage.write(
+      key: _keyAccessToken,
+      value: accessToken,
+    );
+    await _storage.write(
+      key: _keyRefreshToken,
+      value: refreshToken,
+    );
   }
 
   Future<void> saveAccessToken(String accessToken) async {
-    await _storage.write(key: _keyAccessToken, value: accessToken);
+    await _storage.write(
+      key: _keyAccessToken,
+      value: accessToken,
+    );
   }
 
-  Future<String?> getAccessToken() => _storage.read(key: _keyAccessToken);
-  Future<String?> getRefreshToken() => _storage.read(key: _keyRefreshToken);
+  Future<String?> getAccessToken() =>
+      _storage.read(key: _keyAccessToken);
+
+  Future<String?> getRefreshToken() =>
+      _storage.read(key: _keyRefreshToken);
 
   Future<void> clear() async {
     await _storage.delete(key: _keyAccessToken);
@@ -49,36 +69,59 @@ class StorageService {
 
   // Onboarding tracking
   Future<bool> hasCompletedOnboarding() async {
-    final value = await _storage.read(key: _keyHasCompletedOnboarding);
+    final value = await _storage.read(
+      key: _keyHasCompletedOnboarding,
+    );
     return value == 'true';
   }
 
   Future<void> markOnboardingCompleted() async {
-    await _storage.write(key: _keyHasCompletedOnboarding, value: 'true');
+    await _storage.write(
+      key: _keyHasCompletedOnboarding,
+      value: 'true',
+    );
   }
 
   // Theme preference
-  Future<String?> getThemePreference() => _storage.read(key: _keyThemePreference);
+  Future<String?> getThemePreference() =>
+      _storage.read(key: _keyThemePreference);
+
   Future<void> saveThemePreference(String preference) async {
-    await _storage.write(key: _keyThemePreference, value: preference);
+    await _storage.write(
+      key: _keyThemePreference,
+      value: preference,
+    );
   }
 
   // Language preference
-  Future<String?> getLanguageCode() => _storage.read(key: _keyLanguageCode);
+  Future<String?> getLanguageCode() =>
+      _storage.read(key: _keyLanguageCode);
+
   Future<void> saveLanguageCode(String languageCode) async {
-    await _storage.write(key: _keyLanguageCode, value: languageCode);
+    await _storage.write(
+      key: _keyLanguageCode,
+      value: languageCode,
+    );
   }
 
   // Notifications preference
   Future<bool> getNotificationsEnabled() async {
-    final value = await _storage.read(key: _keyNotificationsEnabled);
+    final value = await _storage.read(
+      key: _keyNotificationsEnabled,
+    );
+
     if (value == null) {
-      return true; // Default value when not set
+      return true;
     }
+
     return value == 'true';
   }
+
   Future<void> saveNotificationsEnabled(bool enabled) async {
-    await _storage.write(key: _keyNotificationsEnabled, value: enabled.toString());
+    await _storage.write(
+      key: _keyNotificationsEnabled,
+      value: enabled.toString(),
+    );
   }
 
   /// Upload un fichier vers le backend
@@ -93,15 +136,16 @@ class StorageService {
     String fieldName = 'file',
   }) async {
     final token = await getAccessToken();
+
     if (token == null) {
       throw Exception('Utilisateur non authentifié');
     }
 
     final uri = Uri.parse('${_getBaseUrl()}$endpoint');
+
     final request = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer $token';
 
-    // Add file to request - http package will infer content type from file extension
     request.files.add(
       await http.MultipartFile.fromPath(
         fieldName,
@@ -110,19 +154,23 @@ class StorageService {
     );
 
     final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
+    final responseBody =
+        await response.stream.bytesToString();
     final responseData = json.decode(responseBody);
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
+    if (response.statusCode >= 200 &&
+        response.statusCode < 300) {
       return responseData;
     } else {
-      throw Exception(responseData['message'] ?? 'Erreur lors de l\'upload');
+      throw Exception(
+        responseData['message'] ?? 'Erreur lors de l\'upload',
+      );
     }
   }
 
   String _getBaseUrl() {
     // En développement, utilise l'IP locale
     // En production, utilise l'URL du serveur
-    return 'http://10.0.2.2:8000'; // Adresse IP de l'émulateur Android pour localhost
+    return 'http://10.0.2.2:8000';
   }
 }

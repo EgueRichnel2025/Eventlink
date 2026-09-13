@@ -15,29 +15,58 @@ class GroupMembersScreen extends StatefulWidget {
 }
 
 class _GroupMembersScreenState extends State<GroupMembersScreen> {
+  final _rechercheController = TextEditingController();
+  bool _rechercheOuverte = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<GroupProvider>().chargerMembresDuGroupeCourant();
     });
   }
 
-  Future<void> _retirer(BuildContext context, String userId, String nom) async {
+  @override
+  void dispose() {
+    _rechercheController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _retirer(
+    BuildContext context,
+    String userId,
+    String nom,
+  ) async {
     final confirme = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Retirer ce membre ?'),
-        content: Text('$nom ne pourra plus voir les événements de ce groupe.'),
+        content: Text(
+          '$nom ne pourra plus voir les événements de ce groupe.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Annuler')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Retirer')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Retirer'),
+          ),
         ],
       ),
     );
-    if (confirme == true && context.mounted) {
-      await context.read<GroupProvider>().retirerMembre(userId);
-    }
+
+    if (confirme != true || !context.mounted) return;
+
+    final groupProvider = context.read<GroupProvider>();
+
+    await groupProvider.retirerMembre(userId);
+
+    if (!context.mounted) return;
+
+    await groupProvider.chargerMembresDuGroupeCourant();
   }
 
   @override
@@ -47,21 +76,62 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Membres'),
+        title: _rechercheOuverte
+            ? TextField(
+                controller: _rechercheController,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  hintText: 'Rechercher un membre...',
+                  border: InputBorder.none,
+                ),
+                onChanged: (value) {
+                  final provider = context.read<GroupProvider>();
+                  provider.definirRechercheMembres(value);
+                  provider.chargerMembresDuGroupeCourant();
+                },
+              )
+            : const Text('Membres'),
         actions: [
+          IconButton(
+            icon: Icon(
+              _rechercheOuverte
+                  ? Icons.close_rounded
+                  : Icons.search_rounded,
+            ),
+            onPressed: () {
+              setState(() {
+                _rechercheOuverte = !_rechercheOuverte;
+
+                if (!_rechercheOuverte) {
+                  _rechercheController.clear();
+
+                  final provider = context.read<GroupProvider>();
+                  provider.definirRechercheMembres('');
+                  provider.chargerMembresDuGroupeCourant();
+                }
+              });
+            },
+          ),
           if (groupe?.estAdmin == true)
             IconButton(
               icon: const Icon(Icons.settings_outlined),
-              onPressed: () => Navigator.of(context).pushNamed(AppRoutes.groupSettings),
+              onPressed: () => Navigator.of(context).pushNamed(
+                AppRoutes.groupSettings,
+              ),
             ),
         ],
       ),
       body: Consumer<GroupProvider>(
         builder: (context, provider, _) {
-          if (provider.isLoading && provider.membresDuGroupeCourant.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+          if (provider.isLoading &&
+              provider.membresDuGroupeCourant.isEmpty) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
           }
-          if (provider.errorMessage != null && provider.membresDuGroupeCourant.isEmpty) {
+
+          if (provider.errorMessage != null &&
+              provider.membresDuGroupeCourant.isEmpty) {
             return ErrorRetryView(
               message: provider.errorMessage!,
               onRetry: provider.chargerMembresDuGroupeCourant,
@@ -71,25 +141,67 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
           return ListView.separated(
             padding: const EdgeInsets.all(AppSpacing.lg),
             itemCount: provider.membresDuGroupeCourant.length,
-            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+            separatorBuilder: (_, __) => const SizedBox(
+              height: AppSpacing.sm,
+            ),
             itemBuilder: (context, index) {
-              final membre = provider.membresDuGroupeCourant[index];
+              final membre =
+                  provider.membresDuGroupeCourant[index];
               final estMoi = membre.userId == moi?.id;
+
               return Card(
                 child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppColors.primarySurface,
-                    child: Text(
-                      membre.prenom.isNotEmpty ? membre.prenom[0].toUpperCase() : '?',
-                      style: const TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.w700),
-                    ),
+                  leading: membre.avatarId != null &&
+                          membre.avatarId!.isNotEmpty
+                      ? CircleAvatar(
+                          radius: 14,
+                          backgroundImage: AssetImage(
+                            'assets/images/avatars/${membre.avatarId}.jpeg',
+                          ),
+                        )
+                      : membre.photoUrl != null &&
+                              membre.photoUrl!.isNotEmpty
+                          ? CircleAvatar(
+                              radius: 14,
+                              backgroundImage: NetworkImage(
+                                membre.photoUrl!,
+                              ),
+                            )
+                          : CircleAvatar(
+                              radius: 14,
+                              backgroundColor:
+                                  AppColors.primarySurface,
+                              child: Text(
+                                membre.prenom.isNotEmpty
+                                    ? membre.prenom[0].toUpperCase()
+                                    : '?',
+                                style: const TextStyle(
+                                  color: AppColors.primaryDark,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                  title: Text(
+                    estMoi
+                        ? '${membre.nomComplet} (moi)'
+                        : membre.nomComplet,
                   ),
-                  title: Text(estMoi ? '${membre.nomComplet} (moi)' : membre.nomComplet),
-                  subtitle: Text(_labelRole(membre.role)),
-                  trailing: (groupe?.estAdmin == true && !estMoi && membre.role == 'member')
+                  subtitle: Text(
+                    _labelRole(membre.role),
+                  ),
+                  trailing: groupe?.estAdmin == true &&
+                          !estMoi &&
+                          membre.role == 'member'
                       ? IconButton(
-                          icon: const Icon(Icons.person_remove_outlined, color: AppColors.error),
-                          onPressed: () => _retirer(context, membre.userId, membre.nomComplet),
+                          icon: const Icon(
+                            Icons.person_remove_outlined,
+                            color: AppColors.error,
+                          ),
+                          onPressed: () => _retirer(
+                            context,
+                            membre.userId,
+                            membre.nomComplet,
+                          ),
                         )
                       : null,
                 ),

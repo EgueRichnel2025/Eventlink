@@ -138,14 +138,27 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     const SizedBox(height: AppSpacing.md),
                     Row(
                       children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: AppColors.primarySurface,
-                          child: Text(
-                            event.auteur.prenom.isNotEmpty ? event.auteur.prenom[0].toUpperCase() : '?',
-                            style: const TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.w700),
-                          ),
-                        ),
+                        event.auteur.avatarId != null && event.auteur.avatarId!.isNotEmpty
+                            ? CircleAvatar(
+                                radius: 14,
+                                backgroundImage: AssetImage('assets/images/avatars/${event.auteur.avatarId}.jpeg'),
+                              )
+                            : event.auteur.photoUrl != null && event.auteur.photoUrl!.isNotEmpty
+                                ? CircleAvatar(
+                                    radius: 14,
+                                    backgroundImage: NetworkImage(event.auteur.photoUrl!),
+                                  )
+                                : CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: AppColors.primarySurface,
+                                    child: Text(
+                                      event.auteur.prenom.isNotEmpty ? event.auteur.prenom[0].toUpperCase() : '?',
+                                      style: const TextStyle(
+                                        color: AppColors.primaryDark,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: Column(
@@ -194,14 +207,27 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                CircleAvatar(
-                                  radius: 14,
-                                  backgroundColor: AppColors.primarySurface,
-                                  child: Text(
-                                    c.prenom.isNotEmpty ? c.prenom[0].toUpperCase() : '?',
-                                    style: const TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.w700),
-                                  ),
-                                ),
+                                c.avatarId != null && c.avatarId!.isNotEmpty
+                                    ? CircleAvatar(
+                                        radius: 14,
+                                        backgroundImage: AssetImage('assets/images/avatars/${c.avatarId}.jpeg'),
+                                      )
+                                    : c.photoUrl != null && c.photoUrl!.isNotEmpty
+                                        ? CircleAvatar(
+                                            radius: 14,
+                                            backgroundImage: NetworkImage(c.photoUrl!),
+                                          )
+                                        : CircleAvatar(
+                                            radius: 14,
+                                            backgroundColor: AppColors.primarySurface,
+                                            child: Text(
+                                              c.prenom.isNotEmpty ? c.prenom[0].toUpperCase() : '?',
+                                              style: const TextStyle(
+                                                color: AppColors.primaryDark,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
                                 const SizedBox(width: AppSpacing.sm),
                                 Expanded(
                                   child: Container(
