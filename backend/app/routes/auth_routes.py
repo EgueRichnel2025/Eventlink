@@ -8,8 +8,8 @@ from app.schemas.auth_schemas import (
     CreerProfilRequest,
     RefreshRequest,
     TokenResponse,
-    UpdateProfilRequest,
     UserPublic,
+    UpdateProfilRequest,
 )
 from app.services import auth_service
 from app.utils.dependencies import get_current_user
@@ -20,7 +20,8 @@ router = APIRouter(prefix="/auth", tags=["Authentification"])
 @router.post("/profil", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def creer_profil(payload: CreerProfilRequest, db: AsyncIOMotorDatabase = Depends(get_database)):
     """Première utilisation : crée le profil (prénom/nom) et renvoie les tokens de session."""
-    user = await auth_service.creer_profil(db, payload.prenom, payload.nom)
+    # Note: avatar_id is set during profile creation from the frontend.
+    user = await auth_service.creer_profil(db, payload.prenom, payload.nom, avatar_id=payload.avatar_id)
     access_token, refresh_token = await auth_service.emettre_tokens(db, user["_id"])
     return TokenResponse(
         access_token=access_token,

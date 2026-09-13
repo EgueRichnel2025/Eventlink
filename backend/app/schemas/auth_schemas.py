@@ -8,6 +8,7 @@ from app.utils.objectid import PyObjectId
 class CreerProfilRequest(BaseModel):
     prenom: str = Field(min_length=1, max_length=50)
     nom: str = Field(min_length=1, max_length=50)
+    avatar_id: str | None = None
 
 
 class UserPublic(BaseModel):
@@ -15,6 +16,7 @@ class UserPublic(BaseModel):
     prenom: str
     nom: str
     photo_url: str | None = None
+    avatar_id: str | None = None
     created_at: datetime
 
     model_config = {"populate_by_name": True}
@@ -26,6 +28,8 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserPublic
 
+    model_config = {"populate_by_name": True}
+
 
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -35,8 +39,11 @@ class AccessTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
+    model_config = {"populate_by_name": True}
+
 
 class UpdateProfilRequest(BaseModel):
     prenom: str | None = Field(default=None, min_length=1, max_length=50)
     nom: str | None = Field(default=None, min_length=1, max_length=50)
     photo_url: str | None = None
+    avatar_id: str | None = None
