@@ -10,6 +10,7 @@ from app.schemas.event_schemas import (
     CreerEventRequest,
     EventPublic,
     ModifierEventRequest,
+    ReactionRequest,
 )
 from app.services import event_service, notification_service
 from app.utils.dependencies import get_current_user, get_current_user_id
@@ -155,6 +156,128 @@ async def changer_statut(
 
     await event_service.changer_statut(db, ObjectId(event_id), ObjectId(user_id), payload.statut.value)
     return {"success": True}
+
+
+@router.post("/events/{event_id}/reactions", response_model=dict)
+async def add_reaction(
+    event_id: str,
+    payload: ReactionRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    """Ajoute, modifie ou supprime la réaction d'un utilisateur."""
+
+    event_object_id = ObjectId(event_id)
+    user_object_id = ObjectId(user["_id"])
+    reaction_type = payload.type.strip()
+
+    if not reaction_type:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le type de réaction ne peut pas être vide",
+        )
+
+    event = await event_service.obtenir_event(
+        db,
+        event_object_id,
+        user_object_id,
+    )
+
+    if event is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
+    existing_reaction = await db.event_reactions.find_one(
+        {
+            "event_id": event_object_id,
+            "user_id": user_object_id,
+        }
+    )
+
+    if existing_reaction is None:
+        await db.event_reactions.insert_one(
+            {
+                "event_id": event_object_id,
+                "user_id": user_object_id,
+                "reaction_type": reaction_type,
+            }
+        )
+    elif existing_reaction["reaction_type"] == reaction_type:
+        await db.event_reactions.delete_one(
+            {
+                "_id": existing_reaction["_id"],
+            }
+        )
+    else:
+        await db.event_reactions.update_one(
+            {
+                "_id": existing_reaction["_id"],
+            },
+            {
+                "$set": {
+                    "reaction_type": reaction_type,
+                }
+            },
+        )
+
+    updated_event = await event_service.obtenir_event(
+        db,
+        event_object_id,
+        user_object_id,
+    )
+
+    return EventPublic.model_validate(
+        updated_event
+    ).model_dump()
+
+
+@router.post("/events/{event_id}/views", response_model=dict)
+async def increment_views(
+    event_id: str,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    """Incrémente le nombre de vues d'un événement."""
+
+    event = await db.events.find_one(
+        {"_id": ObjectId(event_id)}
+    )
+
+    if event is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
+    membership = await db.group_members.find_one(
+        {
+            "group_id": event["group_id"],
+            "user_id": ObjectId(user_id),
+        }
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
+
+    await db.events.update_one(
+        {"_id": ObjectId(event_id)},
+        {"$inc": {"vues": 1}},
+    )
+
+    updated_event = await event_service.obtenir_event(
+        db,
+        ObjectId(event_id),
+        ObjectId(user_id),
+    )
+
+    return EventPublic.model_validate(
+        updated_event
+    ).model_dump()
 
 
 @router.get("/events/{event_id}/commentaires", response_model=list[CommentairePublic])

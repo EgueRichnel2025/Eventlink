@@ -32,6 +32,7 @@ async def creer_event(
             "image_url": image_url,
             "categorie": categorie,
             "created_at": now,
+            "vues": 0,
         }
     )
     return await _to_public_event(db, result.inserted_id, auteur_id)
@@ -82,6 +83,7 @@ async def supprimer_event(db: AsyncIOMotorDatabase, event_id: ObjectId) -> None:
     await db.events.delete_one({"_id": event_id})
     await db.comments.delete_many({"event_id": event_id})
     await db.event_statuses.delete_many({"event_id": event_id})
+    await db.event_reactions.delete_many({"event_id": event_id})
 
 
 async def changer_statut(db: AsyncIOMotorDatabase, event_id: ObjectId, user_id: ObjectId, statut: str) -> None:
@@ -128,6 +130,40 @@ async def _to_public_event(
     statut_doc = await db.event_statuses.find_one({"event_id": event["_id"], "user_id": user_id})
     nombre_commentaires = await db.comments.count_documents({"event_id": event["_id"]})
 
+    vues = event.get("vues", 0)
+
+    reaction_counts = await (
+        db.event_reactions.aggregate(
+            [
+                {"$match": {"event_id": event["_id"]}},
+                {
+                    "$group": {
+                        "_id": "$reaction_type",
+                        "count": {"$sum": 1},
+                    }
+                },
+            ]
+        ).to_list(length=None)
+    )
+
+    reactions = {
+        reaction["_id"]: reaction["count"]
+        for reaction in reaction_counts
+    }
+
+    user_reaction_doc = await db.event_reactions.find_one(
+        {
+            "event_id": event["_id"],
+            "user_id": user_id,
+        }
+    )
+
+    user_reaction = (
+        user_reaction_doc["reaction_type"]
+        if user_reaction_doc
+        else None
+    )
+
     return {
         **event,
         "auteur": {
@@ -140,4 +176,7 @@ async def _to_public_event(
         else {"user_id": event["auteur_id"], "prenom": "?", "nom": "", "photo_url": None},
         "mon_statut": statut_doc["statut"] if statut_doc else None,
         "nombre_commentaires": nombre_commentaires,
+        "vues": vues,
+        "reactions": reactions,
+        "user_reaction": user_reaction,
     }

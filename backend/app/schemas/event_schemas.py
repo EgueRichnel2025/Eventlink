@@ -1,5 +1,6 @@
 from datetime import datetime
 from enum import Enum
+from typing import Dict
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -40,6 +41,10 @@ class ChangerStatutRequest(BaseModel):
     statut: StatutPersonnel
 
 
+class ReactionRequest(BaseModel):
+    type: str = Field(min_length=1, max_length=30)
+
+
 class AuteurPublic(BaseModel):
     user_id: PyObjectId
     prenom: str
@@ -58,6 +63,9 @@ class EventPublic(BaseModel):
     created_at: datetime
     mon_statut: StatutPersonnel | None = None
     nombre_commentaires: int = 0
+    vues: int = 0
+    reactions: Dict[str, int] = {}
+    user_reaction: str | None = None
 
     model_config = {"populate_by_name": True}
 

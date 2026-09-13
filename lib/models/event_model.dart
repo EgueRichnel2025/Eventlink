@@ -203,6 +203,7 @@ class EventModel {
 
   EventModel copyWith({
     StatutPersonnel? monStatut,
+    int? nombreCommentaires,
     int? vues,
     Map<String, int>? reactions,
     String? userReaction,
@@ -217,7 +218,7 @@ class EventModel {
       auteur: auteur,
       createdAt: createdAt,
       monStatut: monStatut ?? this.monStatut,
-      nombreCommentaires: nombreCommentaires,
+      nombreCommentaires: nombreCommentaires ?? this.nombreCommentaires,
       vues: vues ?? this.vues,
       reactions: reactions ?? this.reactions,
       userReaction: userReaction ?? this.userReaction,

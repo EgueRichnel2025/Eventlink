@@ -127,16 +127,7 @@ class EventProvider extends ChangeNotifier {
       commentaires = [...commentaires, commentaire];
       events = events
           .map((e) => e.id == eventId
-              ? EventModel(
-                  id: e.id,
-                  groupId: e.groupId,
-                  lien: e.lien,
-                  description: e.description,
-                  imageUrl: e.imageUrl,
-                  categorie: e.categorie,
-                  auteur: e.auteur,
-                  createdAt: e.createdAt,
-                  monStatut: e.monStatut,
+              ? e.copyWith(
                   nombreCommentaires: e.nombreCommentaires + 1,
                 )
               : e)
@@ -147,6 +138,106 @@ class EventProvider extends ChangeNotifier {
       errorMessage = e.message;
       notifyListeners();
       return false;
+    }
+  }
+
+  Future<bool> incrVues(String eventId) async {
+    try {
+      await _eventService.incrVues(eventId);
+      events = events
+          .map((e) => e.id == eventId
+              ? e.copyWith(vues: e.vues + 1)
+              : e)
+          .toList();
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> toggleReaction(String eventId, String reactionType) async {
+    try {
+      await _eventService.toggleReaction(eventId, reactionType);
+
+      events = events
+          .map((e) {
+            if (e.id != eventId) {
+              return e;
+            }
+
+            final anciennesReactions = Map<String, int>.from(e.reactions);
+            final ancienneReaction = e.userReaction;
+
+            if (ancienneReaction == reactionType) {
+              if (anciennesReactions.containsKey(reactionType)) {
+                final nouveauNombre = anciennesReactions[reactionType]! - 1;
+
+                if (nouveauNombre <= 0) {
+                  anciennesReactions.remove(reactionType);
+                } else {
+                  anciennesReactions[reactionType] = nouveauNombre;
+                }
+              }
+
+              return e.copyWith(
+                reactions: anciennesReactions,
+                userReaction: null,
+              );
+            }
+
+            if (ancienneReaction != null) {
+              final ancienNombre =
+                  (anciennesReactions[ancienneReaction] ?? 1) - 1;
+
+              if (ancienNombre <= 0) {
+                anciennesReactions.remove(ancienneReaction);
+              } else {
+                anciennesReactions[ancienneReaction] = ancienNombre;
+              }
+            }
+
+            anciennesReactions[reactionType] =
+                (anciennesReactions[reactionType] ?? 0) + 1;
+
+            return e.copyWith(
+              reactions: anciennesReactions,
+              userReaction: reactionType,
+            );
+          })
+          .toList();
+
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<EventModel?> obtenirEvent(String eventId) async {
+    try {
+      final event = await _eventService.obtenirEvent(eventId);
+
+      final existeDeja = events.any((e) => e.id == event.id);
+
+      if (existeDeja) {
+        events = events
+            .map((e) => e.id == event.id ? event : e)
+            .toList();
+      } else {
+        events = [event, ...events];
+      }
+
+      notifyListeners();
+      return event;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      notifyListeners();
+      return null;
     }
   }
 }

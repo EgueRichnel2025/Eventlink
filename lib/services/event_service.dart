@@ -88,4 +88,12 @@ class EventService {
     ) as Map<String, dynamic>;
     return CommentModel.fromJson(data);
   }
+
+  Future<void> incrVues(String eventId) async {
+    await _api.post('/events/$eventId/views');
+  }
+
+  Future<void> toggleReaction(String eventId, String reactionType) async {
+    await _api.post('/events/$eventId/reactions', body: {'type': reactionType});
+  }
 }
