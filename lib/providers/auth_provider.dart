@@ -38,13 +38,37 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> creerProfil({required String prenom, required String nom}) async {
+  /// Vérifie si l'utilisateur possède déjà un profil (prénom/nom)
+  Future<bool> hasProfile() async {
+    // Si nous avons déjà un utilisateur en mémoire, retourner true
+    if (currentUser != null) {
+      return true;
+    }
+
+    // Sinon, essayer de récupérer le profil depuis le service
+    try {
+      final user = await _authService.monProfil();
+      currentUser = user;
+      status = AuthStatus.connecte;
+      notifyListeners();
+      return true;
+    } on ApiException {
+      // Si une erreur se produit, l'utilisateur n'a pas de profil valide
+      return false;
+    }
+  }
+
+  Future<bool> creerProfil({required String prenom, required String nom, String? avatarId}) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
 
     try {
-      currentUser = await _authService.creerProfil(prenom: prenom, nom: nom);
+      currentUser = await _authService.creerProfil(
+        prenom: prenom,
+        nom: nom,
+        avatarId: avatarId,
+      );
       status = AuthStatus.connecte;
       return true;
     } on ApiException catch (e) {
@@ -56,13 +80,18 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> modifierProfil({String? prenom, String? nom, String? photoUrl}) async {
+  Future<bool> modifierProfil({String? prenom, String? nom, String? photoUrl, String? avatarId}) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
 
     try {
-      currentUser = await _authService.modifierProfil(prenom: prenom, nom: nom, photoUrl: photoUrl);
+      currentUser = await _authService.modifierProfil(
+        prenom: prenom,
+        nom: nom,
+        photoUrl: photoUrl,
+        avatarId: avatarId,
+      );
       return true;
     } on ApiException catch (e) {
       errorMessage = e.message;

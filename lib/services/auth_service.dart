@@ -11,10 +11,14 @@ class AuthService {
         _storage = storage ?? StorageService();
 
   /// Crée le profil (première utilisation) et persiste la session.
-  Future<UserModel> creerProfil({required String prenom, required String nom}) async {
+  Future<UserModel> creerProfil({required String prenom, required String nom, String? avatarId}) async {
     final data = await _api.post(
       '/auth/profil',
-      body: {'prenom': prenom, 'nom': nom},
+      body: {
+        if (prenom != null) 'prenom': prenom,
+        if (nom != null) 'nom': nom,
+        if (avatarId != null) 'avatar_id': avatarId,
+      },
       auth: false,
     ) as Map<String, dynamic>;
 
@@ -31,13 +35,14 @@ class AuthService {
     return UserModel.fromJson(data);
   }
 
-  Future<UserModel> modifierProfil({String? prenom, String? nom, String? photoUrl}) async {
+  Future<UserModel> modifierProfil({String? prenom, String? nom, String? photoUrl, String? avatarId}) async {
     final data = await _api.put(
       '/auth/moi',
       body: {
         if (prenom != null) 'prenom': prenom,
         if (nom != null) 'nom': nom,
         if (photoUrl != null) 'photo_url': photoUrl,
+        if (avatarId != null) 'avatar_id': avatarId,
       },
     ) as Map<String, dynamic>;
     return UserModel.fromJson(data);
