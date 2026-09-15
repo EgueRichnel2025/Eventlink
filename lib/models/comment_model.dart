@@ -1,13 +1,25 @@
 class CommentModel {
   final String id;
+
   final String eventId;
+
   final String userId;
+
   final String prenom;
+
   final String nom;
+
   final String? photoUrl;
+
   final String? avatarId;
+
   final String texte;
+
   final DateTime createdAt;
+
+  final Map<String, int> reactions;
+
+  final String? userReaction;
 
   CommentModel({
     required this.id,
@@ -19,11 +31,23 @@ class CommentModel {
     this.avatarId,
     required this.texte,
     required this.createdAt,
+    this.reactions = const {},
+    this.userReaction,
   });
 
   String get nomComplet => '$prenom $nom';
 
   factory CommentModel.fromJson(Map<String, dynamic> json) {
+    final reactionsJson =
+        json['reactions'] as Map<String, dynamic>? ?? {};
+
+    final reactions = reactionsJson.map(
+      (key, value) => MapEntry(
+        key,
+        (value as num).toInt(),
+      ),
+    );
+
     return CommentModel(
       id: json['_id'] as String,
       eventId: json['event_id'] as String,
@@ -33,7 +57,41 @@ class CommentModel {
       photoUrl: json['photo_url'] as String?,
       avatarId: json['avatar_id'] as String?,
       texte: json['texte'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: DateTime.parse(
+        json['created_at'] as String,
+      ),
+      reactions: reactions,
+      userReaction: json['user_reaction'] as String?,
+    );
+  }
+
+  CommentModel copyWith({
+    String? id,
+    String? eventId,
+    String? userId,
+    String? prenom,
+    String? nom,
+    String? photoUrl,
+    String? avatarId,
+    String? texte,
+    DateTime? createdAt,
+    Map<String, int>? reactions,
+    String? userReaction,
+    bool clearUserReaction = false,
+  }) {
+    return CommentModel(
+      id: id ?? this.id,
+      eventId: eventId ?? this.eventId,
+      userId: userId ?? this.userId,
+      prenom: prenom ?? this.prenom,
+      nom: nom ?? this.nom,
+      photoUrl: photoUrl ?? this.photoUrl,
+      avatarId: avatarId ?? this.avatarId,
+      texte: texte ?? this.texte,
+      createdAt: createdAt ?? this.createdAt,
+      reactions: reactions ?? this.reactions,
+      userReaction:
+          clearUserReaction ? null : userReaction ?? this.userReaction,
     );
   }
 
@@ -47,5 +105,7 @@ class CommentModel {
         'avatar_id': avatarId,
         'texte': texte,
         'created_at': createdAt.toIso8601String(),
+        'reactions': reactions,
+        'user_reaction': userReaction,
       };
 }

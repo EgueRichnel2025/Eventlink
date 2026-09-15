@@ -24,6 +24,7 @@ class EventService {
         'categorie': categorie.name,
       },
     ) as Map<String, dynamic>;
+
     return EventModel.fromJson(data);
   }
 
@@ -42,11 +43,21 @@ class EventService {
         if (recherche != null && recherche.isNotEmpty) 'q': recherche,
       },
     ) as List<dynamic>;
-    return data.map((e) => EventModel.fromJson(e as Map<String, dynamic>)).toList();
+
+    return data
+        .map(
+          (e) => EventModel.fromJson(
+            e as Map<String, dynamic>,
+          ),
+        )
+        .toList();
   }
 
   Future<EventModel> obtenirEvent(String eventId) async {
-    final data = await _api.get('/events/$eventId') as Map<String, dynamic>;
+    final data = await _api.get(
+      '/events/$eventId',
+    ) as Map<String, dynamic>;
+
     return EventModel.fromJson(data);
   }
 
@@ -72,20 +83,45 @@ class EventService {
     await _api.delete('/events/$eventId');
   }
 
-  Future<void> changerStatut(String eventId, StatutPersonnel statut) async {
-    await _api.patch('/events/$eventId/statut', body: {'statut': statut.apiValue});
+  Future<void> changerStatut(
+    String eventId,
+    StatutPersonnel statut,
+  ) async {
+    await _api.patch(
+      '/events/$eventId/statut',
+      body: {
+        'statut': statut.apiValue,
+      },
+    );
   }
 
-  Future<List<CommentModel>> listerCommentaires(String eventId) async {
-    final data = await _api.get('/events/$eventId/commentaires') as List<dynamic>;
-    return data.map((c) => CommentModel.fromJson(c as Map<String, dynamic>)).toList();
+  Future<List<CommentModel>> listerCommentaires(
+    String eventId,
+  ) async {
+    final data = await _api.get(
+      '/events/$eventId/commentaires',
+    ) as List<dynamic>;
+
+    return data
+        .map(
+          (c) => CommentModel.fromJson(
+            c as Map<String, dynamic>,
+          ),
+        )
+        .toList();
   }
 
-  Future<CommentModel> ajouterCommentaire(String eventId, String texte) async {
+  Future<CommentModel> ajouterCommentaire(
+    String eventId,
+    String texte,
+  ) async {
     final data = await _api.post(
       '/events/$eventId/commentaires',
-      body: {'texte': texte},
+      body: {
+        'texte': texte,
+      },
     ) as Map<String, dynamic>;
+
     return CommentModel.fromJson(data);
   }
 
@@ -93,7 +129,30 @@ class EventService {
     await _api.post('/events/$eventId/views');
   }
 
-  Future<void> toggleReaction(String eventId, String reactionType) async {
-    await _api.post('/events/$eventId/reactions', body: {'type': reactionType});
+  Future<void> toggleReaction(
+    String eventId,
+    String reactionType,
+  ) async {
+    await _api.post(
+      '/events/$eventId/reactions',
+      body: {
+        'type': reactionType,
+      },
+    );
+  }
+
+  Future<CommentModel> toggleCommentReaction(
+    String eventId,
+    String commentId,
+    String reactionType,
+  ) async {
+    final data = await _api.post(
+      '/events/$eventId/commentaires/$commentId/reactions',
+      body: {
+        'type': reactionType,
+      },
+    ) as Map<String, dynamic>;
+
+    return CommentModel.fromJson(data);
   }
 }

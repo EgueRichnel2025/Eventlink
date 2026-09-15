@@ -4,24 +4,42 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../config/theme.dart';
+import '../../models/comment_model.dart';
 import '../../models/event_model.dart';
 import '../../providers/event_provider.dart';
 import '../../widgets/error_retry_view.dart';
 
 class EventDetailScreen extends StatefulWidget {
   final String eventId;
-  const EventDetailScreen({super.key, required this.eventId});
+
+  const EventDetailScreen({
+    super.key,
+    required this.eventId,
+  });
 
   @override
-  State<EventDetailScreen> createState() => _EventDetailScreenState();
+  State<EventDetailScreen> createState() =>
+      _EventDetailScreenState();
 }
 
-class _EventDetailScreenState extends State<EventDetailScreen> {
-  final _commentaireController = TextEditingController();
+class _EventDetailScreenState
+    extends State<EventDetailScreen> {
+  final _commentaireController =
+      TextEditingController();
+
   EventModel? _event;
   bool _chargementEvent = true;
   String? _erreur;
   bool _envoiCommentaire = false;
+
+  static const List<String> _reactionsDisponibles = [
+    '👍',
+    '❤️',
+    '😂',
+    '😮',
+    '😢',
+    '🙏',
+  ];
 
   @override
   void initState() {
@@ -43,244 +61,1519 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
 
     // Tente d'abord de trouver l'event déjà en mémoire (liste déjà chargée).
     final events = context.read<EventProvider>();
-    final existant = events.events.where((e) => e.id == widget.eventId).toList();
+
+    final existant = events.events
+        .where((e) => e.id == widget.eventId)
+        .toList();
+
     if (existant.isNotEmpty) {
       _event = existant.first;
     }
 
     try {
-      await events.chargerCommentaires(widget.eventId);
+      final eventCharge =
+          await events.obtenirEvent(widget.eventId);
+
+      if (eventCharge != null) {
+        _event = eventCharge;
+      }
+
+      await events.chargerCommentaires(
+        widget.eventId,
+      );
     } catch (_) {
-      // Géré via errorMessage du provider si besoin, l'écran reste fonctionnel.
+      // Géré via errorMessage du provider si besoin,
+      // l'écran reste fonctionnel avec l'événement déjà chargé.
     }
 
     if (mounted) {
-      setState(() => _chargementEvent = false);
+      setState(() {
+        _chargementEvent = false;
+      });
     }
   }
 
   Future<void> _ouvrirLien() async {
     if (_event == null) return;
+
     final uri = Uri.tryParse(_event!.lien);
+
     if (uri == null) return;
-    final ouvert = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    final ouvert = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
     if (!ouvert && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Impossible d\'ouvrir ce lien.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Impossible d\'ouvrir ce lien.',
+          ),
+        ),
+      );
     }
   }
 
   Future<void> _envoyerCommentaire() async {
-    final texte = _commentaireController.text.trim();
+    final texte =
+        _commentaireController.text.trim();
+
     if (texte.isEmpty) return;
 
-    setState(() => _envoiCommentaire = true);
+    setState(() {
+      _envoiCommentaire = true;
+    });
+
     final events = context.read<EventProvider>();
-    final succes = await events.ajouterCommentaire(widget.eventId, texte);
-    setState(() => _envoiCommentaire = false);
+
+    final succes =
+        await events.ajouterCommentaire(
+      widget.eventId,
+      texte,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _envoiCommentaire = false;
+    });
 
     if (succes) {
       _commentaireController.clear();
-    } else if (mounted && events.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(events.errorMessage!)));
+    } else if (events.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            events.errorMessage!,
+          ),
+        ),
+      );
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_chargementEvent && _event == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    if (_event == null) {
-      return Scaffold(
-        appBar: AppBar(),
-        body: ErrorRetryView(message: _erreur ?? 'Événement introuvable.', onRetry: _charger),
+  Widget _avatarAuteur(EventModel event) {
+    if (event.auteur.avatarId != null &&
+        event.auteur.avatarId!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 28,
+        backgroundImage: AssetImage(
+          'assets/images/avatars/${event.auteur.avatarId}.jpeg',
+        ),
+        onBackgroundImageError: (_, __) {},
       );
     }
 
-    final event = _event!;
-    final dateFormatee = DateFormat('d MMMM yyyy à HH:mm', 'fr_FR').format(event.createdAt.toLocal());
+    if (event.auteur.photoUrl != null &&
+        event.auteur.photoUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 28,
+        backgroundImage: NetworkImage(
+          event.auteur.photoUrl!,
+        ),
+        onBackgroundImageError: (_, __) {},
+      );
+    }
 
-    return Scaffold(
-      appBar: AppBar(title: Text(event.categorie.label)),
-      body: Consumer<EventProvider>(
-        builder: (context, provider, _) {
-          return Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  children: [
-                    if (event.imageUrl != null)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.card),
-                        child: Image.network(event.imageUrl!, height: 200, width: double.infinity, fit: BoxFit.cover),
+    return CircleAvatar(
+      radius: 28,
+      backgroundColor:
+          AppColors.primarySurface,
+      child: Text(
+        event.auteur.prenom.isNotEmpty
+            ? event.auteur.prenom[0]
+                .toUpperCase()
+            : '?',
+        style: const TextStyle(
+          color: AppColors.primaryDark,
+          fontWeight: FontWeight.w800,
+          fontSize: 22,
+        ),
+      ),
+    );
+  }
+
+  Widget _avatarCommentaire(
+    dynamic commentaire,
+  ) {
+    if (commentaire.avatarId != null &&
+        commentaire.avatarId!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 21,
+        backgroundImage: AssetImage(
+          'assets/images/avatars/${commentaire.avatarId}.jpeg',
+        ),
+      );
+    }
+
+    if (commentaire.photoUrl != null &&
+        commentaire.photoUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 21,
+        backgroundImage: NetworkImage(
+          commentaire.photoUrl!,
+        ),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 21,
+      backgroundColor:
+          AppColors.primarySurface,
+      child: Text(
+        commentaire.prenom.isNotEmpty
+            ? commentaire.prenom[0]
+                .toUpperCase()
+            : '?',
+        style: const TextStyle(
+          color: AppColors.primaryDark,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _afficherPaletteReactions(
+    CommentModel commentaire,
+  ) async {
+    final provider =
+        context.read<EventProvider>();
+
+    final reaction = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius:
+                  BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black
+                      .withValues(alpha: 0.15),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment:
+                  MainAxisAlignment.spaceEvenly,
+              children:
+                  _reactionsDisponibles.map((emoji) {
+                final selectionne =
+                    commentaire.userReaction ==
+                        emoji;
+
+                return Material(
+                  color: selectionne
+                      ? AppColors.primarySurface
+                      : Colors.transparent,
+                  borderRadius:
+                      BorderRadius.circular(18),
+                  child: InkWell(
+                    borderRadius:
+                        BorderRadius.circular(18),
+                    onTap: () {
+                      Navigator.of(context)
+                          .pop(emoji);
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius:
+                            BorderRadius.circular(
+                          18,
+                        ),
+                        border: selectionne
+                            ? Border.all(
+                                color:
+                                    AppColors.primary,
+                                width: 1.5,
+                              )
+                            : null,
                       ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(event.description, style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: AppSpacing.md),
-                    InkWell(
-                      onTap: _ouvrirLien,
-                      child: Row(
-                        children: [
-                          const Icon(Icons.link_rounded, color: AppColors.primary, size: 18),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              event.lien,
-                              style: const TextStyle(color: AppColors.primary, decoration: TextDecoration.underline),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        emoji,
+                        style: const TextStyle(
+                          fontSize: 25,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (reaction == null || !mounted) {
+      return;
+    }
+
+    final succes =
+        await provider.toggleCommentReaction(
+      eventId: widget.eventId,
+      commentId: commentaire.id,
+      reactionType: reaction,
+    );
+
+    if (!succes &&
+        mounted &&
+        provider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            provider.errorMessage!,
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _reactionsCommentaire(
+    CommentModel commentaire,
+  ) {
+    if (commentaire.reactions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final reactions = commentaire.reactions.entries
+        .where((entry) => entry.value > 0)
+        .toList();
+
+    if (reactions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(
+        top: 8,
+        left: 4,
+      ),
+      child: Wrap(
+        spacing: 5,
+        runSpacing: 5,
+        children: reactions.map((entry) {
+          final estMaReaction =
+              commentaire.userReaction ==
+                  entry.key;
+
+          return Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 4,
+            ),
+            decoration: BoxDecoration(
+              color: estMaReaction
+                  ? AppColors.primarySurface
+                  : Colors.white,
+              borderRadius:
+                  BorderRadius.circular(14),
+              border: Border.all(
+                color: estMaReaction
+                    ? AppColors.primary
+                    : Colors.grey.withValues(
+                        alpha: 0.18,
+                      ),
+                width: estMaReaction ? 1.2 : 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black
+                      .withValues(alpha: 0.04),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  entry.key,
+                  style: const TextStyle(
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  '${entry.value}',
+                  style: TextStyle(
+                    color: estMaReaction
+                        ? AppColors.primaryDark
+                        : AppColors.textPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _sectionTitre({
+    required IconData icon,
+    required String titre,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.primarySurface,
+            borderRadius:
+                BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: AppColors.primaryDark,
+            size: 19,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Text(
+          titre,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _carteImage(EventModel event) {
+    if (event.imageUrl == null ||
+        event.imageUrl!.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(
+        bottom: AppSpacing.lg,
+      ),
+      decoration: BoxDecoration(
+        borderRadius:
+            BorderRadius.circular(AppRadius.card),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black
+                .withValues(alpha: 0.10),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius:
+            BorderRadius.circular(AppRadius.card),
+        child: AspectRatio(
+          aspectRatio: 16 / 10,
+          child: Image.network(
+            event.imageUrl!,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            loadingBuilder: (
+              context,
+              child,
+              loadingProgress,
+            ) {
+              if (loadingProgress == null) {
+                return child;
+              }
+
+              return Container(
+                color: AppColors.surfaceMuted,
+                child: const Center(
+                  child:
+                      CircularProgressIndicator(),
+                ),
+              );
+            },
+            errorBuilder: (
+              context,
+              error,
+              stackTrace,
+            ) {
+              return Container(
+                color: AppColors.surfaceMuted,
+                child: const Column(
+                  mainAxisAlignment:
+                      MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons
+                          .image_not_supported_outlined,
+                      size: 44,
+                      color: Colors.grey,
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Image indisponible',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontWeight:
+                            FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _carteAuteur(
+    EventModel event,
+    String dateFormatee,
+  ) {
+    return Container(
+      padding:
+          const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius:
+            BorderRadius.circular(AppRadius.card),
+        border: Border.all(
+          color: Colors.grey
+              .withValues(alpha: 0.14),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black
+                .withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _avatarAuteur(event),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Publié par',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 13,
+                    fontWeight:
+                        FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  event.auteur.nomComplet,
+                  style: const TextStyle(
+                    color:
+                        AppColors.textPrimary,
+                    fontSize: 17,
+                    fontWeight:
+                        FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Publié le $dateFormatee',
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _carteLien(EventModel event) {
+    return InkWell(
+      onTap: _ouvrirLien,
+      borderRadius:
+          BorderRadius.circular(AppRadius.card),
+      child: Container(
+        padding:
+            const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.primarySurface
+              .withValues(alpha: 0.55),
+          borderRadius:
+              BorderRadius.circular(AppRadius.card),
+          border: Border.all(
+            color: AppColors.primary
+                .withValues(alpha: 0.55),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primary
+                  .withValues(alpha: 0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius:
+                    BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.link_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(
+              width: AppSpacing.md,
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Lien de l\'événement',
+                    style: TextStyle(
+                      color:
+                          AppColors.textPrimary,
+                      fontWeight:
+                          FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    event.lien,
+                    maxLines: 2,
+                    overflow:
+                        TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color:
+                          AppColors.primaryDark,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  const Row(
+                    children: [
+                      Text(
+                        'Ouvrir le lien',
+                        style: TextStyle(
+                          color:
+                              AppColors.primaryDark,
+                          fontWeight:
+                              FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(
+                        Icons
+                            .arrow_forward_rounded,
+                        color:
+                            AppColors.primaryDark,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _carteStatistiques(
+    EventModel event,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius:
+            BorderRadius.circular(AppRadius.card),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _statistique(
+              icon: Icons.visibility_outlined,
+              valeur: '${event.vues}',
+              label: 'vues',
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 34,
+            color: Colors.grey
+                .withValues(alpha: 0.20),
+          ),
+          Expanded(
+            child: _statistique(
+              icon:
+                  Icons.chat_bubble_outline_rounded,
+              valeur:
+                  '${event.nombreCommentaires}',
+              label: 'commentaires',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statistique({
+    required IconData icon,
+    required String valeur,
+    required String label,
+  }) {
+    return Row(
+      mainAxisAlignment:
+          MainAxisAlignment.center,
+      children: [
+        Icon(
+          icon,
+          size: 19,
+          color: AppColors.primaryDark,
+        ),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            Text(
+              valeur,
+              style: const TextStyle(
+                color:
+                    AppColors.textPrimary,
+                fontWeight:
+                    FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.grey,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _carteCommentaire(
+    CommentModel commentaire,
+  ) {
+    final date = DateFormat(
+      'dd/MM à HH:mm',
+      'fr_FR',
+    ).format(
+      commentaire.createdAt.toLocal(),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(
+        bottom: AppSpacing.md,
+      ),
+      child: GestureDetector(
+        onLongPress: () =>
+            _afficherPaletteReactions(
+          commentaire,
+        ),
+        child: Row(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+          children: [
+            _avatarCommentaire(
+              commentaire,
+            ),
+            const SizedBox(
+              width: AppSpacing.sm,
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.all(
+                      AppSpacing.md,
+                    ),
+                    decoration:
+                        const BoxDecoration(
+                      color:
+                          AppColors.surfaceMuted,
+                      borderRadius:
+                          BorderRadius.only(
+                        topRight:
+                            Radius.circular(16),
+                        bottomLeft:
+                            Radius.circular(16),
+                        bottomRight:
+                            Radius.circular(16),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
                       children: [
-                        event.auteur.avatarId != null && event.auteur.avatarId!.isNotEmpty
-                            ? CircleAvatar(
-                                radius: 14,
-                                backgroundImage: AssetImage('assets/images/avatars/${event.auteur.avatarId}.jpeg'),
-                              )
-                            : event.auteur.photoUrl != null && event.auteur.photoUrl!.isNotEmpty
-                                ? CircleAvatar(
-                                    radius: 14,
-                                    backgroundImage: NetworkImage(event.auteur.photoUrl!),
-                                  )
-                                : CircleAvatar(
-                                    radius: 14,
-                                    backgroundColor: AppColors.primarySurface,
-                                    child: Text(
-                                      event.auteur.prenom.isNotEmpty ? event.auteur.prenom[0].toUpperCase() : '?',
-                                      style: const TextStyle(
-                                        color: AppColors.primaryDark,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(event.auteur.nomComplet, style: Theme.of(context).textTheme.titleMedium),
-                              Text(dateFormatee, style: Theme.of(context).textTheme.bodyMedium),
-                            ],
+                        Row(
+                          crossAxisAlignment:
+                              CrossAxisAlignment
+                                  .start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                commentaire
+                                    .nomComplet,
+                                style:
+                                    const TextStyle(
+                                  color:
+                                      AppColors
+                                          .textPrimary,
+                                  fontSize: 15,
+                                  fontWeight:
+                                      FontWeight
+                                          .w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(
+                              width: 8,
+                            ),
+                            Text(
+                              date,
+                              style:
+                                  const TextStyle(
+                                color:
+                                    Colors.grey,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          commentaire.texte,
+                          style:
+                              const TextStyle(
+                            color: AppColors
+                                .textPrimary,
+                            fontSize: 14,
+                            height: 1.4,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    Wrap(
-                      spacing: 8,
-                      children: StatutPersonnel.values.map((s) {
-                        final selectionne = event.monStatut == s;
-                        return ChoiceChip(
-                          label: Text('${s.emoji} ${s.label}'),
-                          selected: selectionne,
-                          onSelected: (_) async {
-                            await provider.changerStatut(event.id, s);
-                            setState(() {
-                              _event = event.copyWith(monStatut: s);
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const Divider(height: AppSpacing.xl * 2),
-                    Text('Commentaires', style: Theme.of(context).textTheme.titleLarge),
-                    const SizedBox(height: AppSpacing.md),
-                    if (provider.chargementCommentaires)
-                      const Center(child: CircularProgressIndicator())
-                    else if (provider.commentaires.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  ),
+                  _reactionsCommentaire(
+                    commentaire,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_chargementEvent &&
+        _event == null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 2,
+          shadowColor: Colors.black
+              .withValues(alpha: 0.12),
+          surfaceTintColor: Colors.white,
+          leading: IconButton(
+            tooltip: 'Retour',
+            onPressed: () =>
+                Navigator.of(context)
+                    .maybePop(),
+            icon: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color:
+                    AppColors.primarySurface,
+                borderRadius:
+                    BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color:
+                    AppColors.primaryDark,
+                size: 21,
+              ),
+            ),
+          ),
+          title: const Text(
+            'Événement',
+            style: TextStyle(
+              color:
+                  AppColors.textPrimary,
+              fontWeight:
+                  FontWeight.w800,
+            ),
+          ),
+        ),
+        body: const Center(
+          child:
+              CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_event == null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 2,
+          shadowColor: Colors.black
+              .withValues(alpha: 0.12),
+          surfaceTintColor: Colors.white,
+          leading: IconButton(
+            tooltip: 'Retour',
+            onPressed: () =>
+                Navigator.of(context)
+                    .maybePop(),
+            icon: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color:
+                    AppColors.primarySurface,
+                borderRadius:
+                    BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.arrow_back_rounded,
+                color:
+                    AppColors.primaryDark,
+                size: 21,
+              ),
+            ),
+          ),
+          title: const Text(
+            'Événement',
+            style: TextStyle(
+              color:
+                  AppColors.textPrimary,
+              fontWeight:
+                  FontWeight.w800,
+            ),
+          ),
+        ),
+        body: ErrorRetryView(
+          message: _erreur ??
+              'Événement introuvable.',
+          onRetry: _charger,
+        ),
+      );
+    }
+
+    final event = _event!;
+
+    final dateFormatee = DateFormat(
+      'd MMMM yyyy à HH:mm',
+      'fr_FR',
+    ).format(
+      event.createdAt.toLocal(),
+    );
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        automaticallyImplyLeading: true,
+        backgroundColor: Colors.white,
+        foregroundColor:
+            AppColors.textPrimary,
+        elevation: 2,
+        shadowColor: Colors.black
+            .withValues(alpha: 0.12),
+        surfaceTintColor: Colors.white,
+        scrolledUnderElevation: 2,
+        leading: IconButton(
+          tooltip: 'Retour',
+          onPressed: () =>
+              Navigator.of(context)
+                  .maybePop(),
+          icon: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color:
+                  AppColors.primarySurface,
+              borderRadius:
+                  BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.arrow_back_rounded,
+              color:
+                  AppColors.primaryDark,
+              size: 22,
+            ),
+          ),
+        ),
+        titleSpacing: 4,
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                event.categorie.label,
+                maxLines: 1,
+                overflow:
+                    TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color:
+                      AppColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight:
+                      FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: Consumer<EventProvider>(
+        builder: (
+          context,
+          provider,
+          _,
+        ) {
+          return Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding:
+                      const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                    AppSpacing.lg,
+                    AppSpacing.xl,
+                  ),
+                  children: [
+                    _carteImage(event),
+
+                    Align(
+                      alignment:
+                          Alignment.centerLeft,
+                      child: Container(
+                        padding:
+                            const EdgeInsets
+                                .symmetric(
+                          horizontal: 11,
+                          vertical: 6,
+                        ),
+                        decoration:
+                            BoxDecoration(
+                          color:
+                              AppColors
+                                  .primarySurface,
+                          borderRadius:
+                              BorderRadius
+                                  .circular(20),
+                        ),
                         child: Text(
-                          'Aucun commentaire. Soyez le premier à réagir !',
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          event.categorie.label,
+                          style:
+                              const TextStyle(
+                            color:
+                                AppColors
+                                    .primaryDark,
+                            fontSize: 12,
+                            fontWeight:
+                                FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height: AppSpacing.md,
+                    ),
+
+                    _sectionTitre(
+                      icon:
+                          Icons.article_outlined,
+                      titre:
+                          'À propos de cet événement',
+                    ),
+
+                    const SizedBox(
+                      height: AppSpacing.sm,
+                    ),
+
+                    Container(
+                      padding:
+                          const EdgeInsets.all(
+                        AppSpacing.md,
+                      ),
+                      decoration:
+                          BoxDecoration(
+                        color: Colors.white,
+                        borderRadius:
+                            BorderRadius
+                                .circular(
+                          AppRadius.card,
+                        ),
+                        border: Border.all(
+                          color: Colors.grey
+                              .withValues(
+                            alpha: 0.14,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        event.description,
+                        style:
+                            const TextStyle(
+                          color:
+                              AppColors
+                                  .textPrimary,
+                          fontSize: 15,
+                          height: 1.55,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height: AppSpacing.lg,
+                    ),
+
+                    _sectionTitre(
+                      icon:
+                          Icons.person_outline_rounded,
+                      titre: 'Auteur',
+                    ),
+
+                    const SizedBox(
+                      height: AppSpacing.sm,
+                    ),
+
+                    _carteAuteur(
+                      event,
+                      dateFormatee,
+                    ),
+
+                    const SizedBox(
+                      height: AppSpacing.lg,
+                    ),
+
+                    _sectionTitre(
+                      icon:
+                          Icons.link_rounded,
+                      titre: 'Lien',
+                    ),
+
+                    const SizedBox(
+                      height: AppSpacing.sm,
+                    ),
+
+                    _carteLien(event),
+
+                    const SizedBox(
+                      height: AppSpacing.lg,
+                    ),
+
+                    _sectionTitre(
+                      icon:
+                          Icons.event_available_outlined,
+                      titre: 'Mon statut',
+                    ),
+
+                    const SizedBox(
+                      height: AppSpacing.sm,
+                    ),
+
+                    Container(
+                      padding:
+                          const EdgeInsets.all(
+                        AppSpacing.sm,
+                      ),
+                      decoration:
+                          BoxDecoration(
+                        color:
+                            AppColors
+                                .surfaceMuted,
+                        borderRadius:
+                            BorderRadius
+                                .circular(
+                          AppRadius.card,
+                        ),
+                      ),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children:
+                            StatutPersonnel
+                                .values
+                                .map((s) {
+                          final selectionne =
+                              event.monStatut ==
+                                  s;
+
+                          return ChoiceChip(
+                            label: Text(
+                              '${s.emoji} ${s.label}',
+                            ),
+                            selected:
+                                selectionne,
+                            onSelected:
+                                (_) async {
+                              final succes =
+                                  await provider
+                                      .changerStatut(
+                                event.id,
+                                s,
+                              );
+
+                              if (!mounted ||
+                                  !succes) {
+                                return;
+                              }
+
+                              setState(() {
+                                _event =
+                                    event.copyWith(
+                                  monStatut: s,
+                                );
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                    const SizedBox(
+                      height: AppSpacing.lg,
+                    ),
+
+                    _sectionTitre(
+                      icon:
+                          Icons.insights_outlined,
+                      titre: 'Statistiques',
+                    ),
+
+                    const SizedBox(
+                      height: AppSpacing.sm,
+                    ),
+
+                    _carteStatistiques(event),
+
+                    const SizedBox(
+                      height: AppSpacing.xl,
+                    ),
+
+                    _sectionTitre(
+                      icon:
+                          Icons.chat_bubble_outline_rounded,
+                      titre: 'Commentaires',
+                    ),
+
+                    const SizedBox(
+                      height: AppSpacing.md,
+                    ),
+
+                    if (provider
+                        .chargementCommentaires)
+                      const Padding(
+                        padding:
+                            EdgeInsets.symmetric(
+                          vertical:
+                              AppSpacing.lg,
+                        ),
+                        child: Center(
+                          child:
+                              CircularProgressIndicator(),
+                        ),
+                      )
+                    else if (provider
+                        .commentaires.isEmpty)
+                      Container(
+                        padding:
+                            const EdgeInsets
+                                .symmetric(
+                          horizontal:
+                              AppSpacing.md,
+                          vertical:
+                              AppSpacing.lg,
+                        ),
+                        decoration:
+                            BoxDecoration(
+                          color:
+                              AppColors
+                                  .surfaceMuted,
+                          borderRadius:
+                              BorderRadius
+                                  .circular(
+                            AppRadius.card,
+                          ),
+                        ),
+                        child: const Column(
+                          children: [
+                            Icon(
+                              Icons
+                                  .chat_bubble_outline_rounded,
+                              size: 34,
+                              color:
+                                  Colors.grey,
+                            ),
+                            SizedBox(
+                              height: 8,
+                            ),
+                            Text(
+                              'Aucun commentaire pour le moment.',
+                              textAlign:
+                                  TextAlign
+                                      .center,
+                              style:
+                                  TextStyle(
+                                color:
+                                    AppColors
+                                        .textPrimary,
+                                fontWeight:
+                                    FontWeight
+                                        .w700,
+                              ),
+                            ),
+                            SizedBox(
+                              height: 3,
+                            ),
+                            Text(
+                              'Soyez le premier à réagir !',
+                              textAlign:
+                                  TextAlign
+                                      .center,
+                              style:
+                                  TextStyle(
+                                color:
+                                    Colors.grey,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ),
                       )
                     else
-                      ...provider.commentaires.map((c) => Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                c.avatarId != null && c.avatarId!.isNotEmpty
-                                    ? CircleAvatar(
-                                        radius: 14,
-                                        backgroundImage: AssetImage('assets/images/avatars/${c.avatarId}.jpeg'),
-                                      )
-                                    : c.photoUrl != null && c.photoUrl!.isNotEmpty
-                                        ? CircleAvatar(
-                                            radius: 14,
-                                            backgroundImage: NetworkImage(c.photoUrl!),
-                                          )
-                                        : CircleAvatar(
-                                            radius: 14,
-                                            backgroundColor: AppColors.primarySurface,
-                                            child: Text(
-                                              c.prenom.isNotEmpty ? c.prenom[0].toUpperCase() : '?',
-                                              style: const TextStyle(
-                                                color: AppColors.primaryDark,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                          ),
-                                const SizedBox(width: AppSpacing.sm),
-                                Expanded(
-                                  child: Container(
-                                    padding: const EdgeInsets.all(AppSpacing.sm),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.surfaceMuted,
-                                      borderRadius: BorderRadius.circular(AppRadius.button),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(c.nomComplet, style: Theme.of(context).textTheme.titleMedium),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              DateFormat('HH:mm', 'fr_FR').format(c.createdAt.toLocal()),
-                                              style: Theme.of(context).textTheme.bodyMedium,
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(c.texte),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )),
+                      ...provider.commentaires
+                          .map(
+                        (commentaire) =>
+                            _carteCommentaire(
+                          commentaire,
+                        ),
+                      ),
                   ],
                 ),
               ),
+
               SafeArea(
                 top: false,
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.md),
+                child: Container(
+                  padding:
+                      const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                    AppSpacing.md,
+                  ),
+                  decoration:
+                      BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black
+                            .withValues(
+                          alpha: 0.08,
+                        ),
+                        blurRadius: 12,
+                        offset:
+                            const Offset(0, -3),
+                      ),
+                    ],
+                  ),
                   child: Row(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.end,
                     children: [
                       Expanded(
                         child: TextField(
-                          controller: _commentaireController,
-                          decoration: const InputDecoration(hintText: 'Ajouter un commentaire...'),
-                          onSubmitted: (_) => _envoyerCommentaire(),
+                          controller:
+                              _commentaireController,
+                          minLines: 1,
+                          maxLines: 4,
+                          style:
+                              const TextStyle(
+                            color:
+                                AppColors
+                                    .textPrimary,
+                            fontSize: 15,
+                          ),
+                          cursorColor:
+                              AppColors.primary,
+                          decoration:
+                              InputDecoration(
+                            hintText:
+                                'Ajouter un commentaire...',
+                            hintStyle:
+                                TextStyle(
+                              color: Colors
+                                  .grey
+                                  .shade600,
+                              fontSize: 14,
+                            ),
+                            filled: true,
+                            fillColor:
+                                AppColors
+                                    .surfaceMuted,
+                            contentPadding:
+                                const EdgeInsets
+                                    .symmetric(
+                              horizontal: 15,
+                              vertical: 12,
+                            ),
+                            border:
+                                OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius
+                                      .circular(
+                                22,
+                              ),
+                              borderSide:
+                                  BorderSide
+                                      .none,
+                            ),
+                            enabledBorder:
+                                OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius
+                                      .circular(
+                                22,
+                              ),
+                              borderSide:
+                                  BorderSide(
+                                color: Colors
+                                    .grey
+                                    .withValues(
+                                  alpha: 0.15,
+                                ),
+                              ),
+                            ),
+                            focusedBorder:
+                                OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius
+                                      .circular(
+                                22,
+                              ),
+                              borderSide:
+                                  const BorderSide(
+                                color:
+                                    AppColors
+                                        .primary,
+                                width: 1.3,
+                              ),
+                            ),
+                          ),
+                          onSubmitted: (_) =>
+                              _envoyerCommentaire(),
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.sm),
-                      IconButton.filled(
-                        onPressed: _envoiCommentaire ? null : _envoyerCommentaire,
-                        icon: _envoiCommentaire
-                            ? const SizedBox(
-                                width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.send_rounded),
+                      const SizedBox(
+                        width: AppSpacing.sm,
+                      ),
+                      SizedBox(
+                        width: 46,
+                        height: 46,
+                        child:
+                            IconButton.filled(
+                          onPressed:
+                              _envoiCommentaire
+                                  ? null
+                                  : _envoyerCommentaire,
+                          style:
+                              IconButton.styleFrom(
+                            backgroundColor:
+                                AppColors.primary,
+                            foregroundColor:
+                                Colors.white,
+                            disabledBackgroundColor:
+                                AppColors.primary
+                                    .withValues(
+                              alpha: 0.45,
+                            ),
+                          ),
+                          icon: _envoiCommentaire
+                              ? const SizedBox(
+                                  width: 17,
+                                  height: 17,
+                                  child:
+                                      CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color:
+                                        Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons
+                                      .send_rounded,
+                                  size: 21,
+                                ),
+                        ),
                       ),
                     ],
                   ),

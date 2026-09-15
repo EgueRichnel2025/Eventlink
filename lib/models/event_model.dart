@@ -135,11 +135,19 @@ class AuteurEvent {
   final String? photoUrl;
   final String? avatarId;
 
-  AuteurEvent({required this.userId, required this.prenom, required this.nom, this.photoUrl, this.avatarId});
+  AuteurEvent({
+    required this.userId,
+    required this.prenom,
+    required this.nom,
+    this.photoUrl,
+    this.avatarId,
+  });
 
   String get nomComplet => '$prenom $nom';
 
-  factory AuteurEvent.fromJson(Map<String, dynamic> json) {
+  factory AuteurEvent.fromJson(
+    Map<String, dynamic> json,
+  ) {
     return AuteurEvent(
       userId: json['user_id'] as String,
       prenom: json['prenom'] as String,
@@ -161,9 +169,9 @@ class EventModel {
   final DateTime createdAt;
   final StatutPersonnel? monStatut;
   final int nombreCommentaires;
-  final int vues; // Number of views
-  final Map<String, int> reactions; // Reaction type -> count
-  final String? userReaction; // Current user's reaction type (if any)
+  final int vues;
+  final Map<String, int> reactions;
+  final String? userReaction;
 
   EventModel({
     required this.id,
@@ -181,22 +189,39 @@ class EventModel {
     this.userReaction,
   });
 
-  factory EventModel.fromJson(Map<String, dynamic> json) {
+  factory EventModel.fromJson(
+    Map<String, dynamic> json,
+  ) {
     return EventModel(
       id: json['_id'] as String,
       groupId: json['group_id'] as String,
       lien: json['lien'] as String,
       description: json['description'] as String,
       imageUrl: json['image_url'] as String?,
-      categorie: CategorieEvent.fromString(json['categorie'] as String),
-      auteur: AuteurEvent.fromJson(json['auteur'] as Map<String, dynamic>),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      monStatut: StatutPersonnel.fromString(json['mon_statut'] as String?),
-      nombreCommentaires: json['nombre_commentaires'] as int? ?? 0,
+      categorie: CategorieEvent.fromString(
+        json['categorie'] as String,
+      ),
+      auteur: AuteurEvent.fromJson(
+        json['auteur'] as Map<String, dynamic>,
+      ),
+      createdAt: DateTime.parse(
+        json['created_at'] as String,
+      ),
+      monStatut: StatutPersonnel.fromString(
+        json['mon_statut'] as String?,
+      ),
+      nombreCommentaires:
+          json['nombre_commentaires'] as int? ?? 0,
       vues: json['vues'] as int? ?? 0,
-      reactions: (json['reactions'] as Map<String, dynamic>?)
-              ?.map((key, value) => MapEntry(key, value as int))
-              ?? const {},
+      reactions:
+          (json['reactions'] as Map<String, dynamic>?)
+                  ?.map(
+                    (key, value) => MapEntry(
+                      key,
+                      value as int,
+                    ),
+                  ) ??
+              const {},
       userReaction: json['user_reaction'] as String?,
     );
   }
@@ -207,6 +232,7 @@ class EventModel {
     int? vues,
     Map<String, int>? reactions,
     String? userReaction,
+    bool clearUserReaction = false,
   }) {
     return EventModel(
       id: id,
@@ -218,10 +244,12 @@ class EventModel {
       auteur: auteur,
       createdAt: createdAt,
       monStatut: monStatut ?? this.monStatut,
-      nombreCommentaires: nombreCommentaires ?? this.nombreCommentaires,
+      nombreCommentaires:
+          nombreCommentaires ?? this.nombreCommentaires,
       vues: vues ?? this.vues,
       reactions: reactions ?? this.reactions,
-      userReaction: userReaction ?? this.userReaction,
+      userReaction:
+          clearUserReaction ? null : userReaction ?? this.userReaction,
     );
   }
 }

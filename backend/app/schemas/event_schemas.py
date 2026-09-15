@@ -81,7 +81,13 @@ class CommentairePublic(BaseModel):
     prenom: str
     nom: str
     photo_url: str | None = None
+    avatar_id: str | None = None
     texte: str
     created_at: datetime
 
+    # Réactions du commentaire
+    reactions: Dict[str, int] = {}
+    user_reaction: str | None = None
+
     model_config = {"populate_by_name": True}
+    

@@ -47,58 +47,135 @@ async def lister_events(
     recherche: str | None = None,
 ) -> list[dict]:
     query: dict = {"group_id": group_id}
+
     if categorie:
         query["categorie"] = categorie
+
     if recherche:
         query["$or"] = [
             {"description": {"$regex": recherche, "$options": "i"}},
             {"lien": {"$regex": recherche, "$options": "i"}},
         ]
 
-    events = await db.events.find(query).sort("created_at", -1).to_list(length=500)
+    events = await db.events.find(query).sort(
+        "created_at",
+        -1,
+    ).to_list(length=500)
 
     resultats = []
+
     for e in events:
-        public = await _to_public_event(db, e["_id"], user_id, event_doc=e)
+        public = await _to_public_event(
+            db,
+            e["_id"],
+            user_id,
+            event_doc=e,
+        )
+
         if statut and public.get("mon_statut") != statut:
             continue
+
         resultats.append(public)
+
     return resultats
 
 
-async def obtenir_event(db: AsyncIOMotorDatabase, event_id: ObjectId, user_id: ObjectId) -> dict:
-    event = await _to_public_event(db, event_id, user_id)
+async def obtenir_event(
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+    user_id: ObjectId,
+) -> dict:
+    event = await _to_public_event(
+        db,
+        event_id,
+        user_id,
+    )
+
     if event is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Événement introuvable")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
     return event
 
 
-async def modifier_event(db: AsyncIOMotorDatabase, event_id: ObjectId, updates: dict) -> None:
-    updates = {k: v for k, v in updates.items() if v is not None}
+async def modifier_event(
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+    updates: dict,
+) -> None:
+    updates = {
+        k: v
+        for k, v in updates.items()
+        if v is not None
+    }
+
     if updates:
-        await db.events.update_one({"_id": event_id}, {"$set": updates})
+        await db.events.update_one(
+            {"_id": event_id},
+            {"$set": updates},
+        )
 
 
-async def supprimer_event(db: AsyncIOMotorDatabase, event_id: ObjectId) -> None:
-    await db.events.delete_one({"_id": event_id})
-    await db.comments.delete_many({"event_id": event_id})
-    await db.event_statuses.delete_many({"event_id": event_id})
-    await db.event_reactions.delete_many({"event_id": event_id})
+async def supprimer_event(
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+) -> None:
+    await db.events.delete_one(
+        {"_id": event_id}
+    )
+
+    await db.comments.delete_many(
+        {"event_id": event_id}
+    )
+
+    await db.event_statuses.delete_many(
+        {"event_id": event_id}
+    )
+
+    await db.event_reactions.delete_many(
+        {"event_id": event_id}
+    )
+
+    await db.comment_reactions.delete_many(
+        {"event_id": event_id}
+    )
 
 
-async def changer_statut(db: AsyncIOMotorDatabase, event_id: ObjectId, user_id: ObjectId, statut: str) -> None:
+async def changer_statut(
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+    user_id: ObjectId,
+    statut: str,
+) -> None:
     await db.event_statuses.update_one(
-        {"event_id": event_id, "user_id": user_id},
-        {"$set": {"statut": statut, "updated_at": datetime.now(timezone.utc)}},
+        {
+            "event_id": event_id,
+            "user_id": user_id,
+        },
+        {
+            "$set": {
+                "statut": statut,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
         upsert=True,
     )
 
 
 async def ajouter_commentaire(
-    db: AsyncIOMotorDatabase, event_id: ObjectId, user_id: ObjectId, texte: str
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+    user_id: ObjectId,
+    texte: str,
 ) -> dict:
-    user = await db.users.find_one({"_id": user_id})
+    user = await db.users.find_one(
+        {"_id": user_id}
+    )
+
     now = datetime.now(timezone.utc)
+
     result = await db.comments.insert_one(
         {
             "event_id": event_id,
@@ -106,36 +183,214 @@ async def ajouter_commentaire(
             "prenom": user["prenom"],
             "nom": user["nom"],
             "photo_url": user.get("photo_url"),
+            "avatar_id": user.get("avatar_id"),
             "texte": texte.strip(),
             "created_at": now,
         }
     )
-    return await db.comments.find_one({"_id": result.inserted_id})
+
+    commentaire = await db.comments.find_one(
+        {"_id": result.inserted_id}
+    )
+
+    return await _to_public_comment(
+        db,
+        commentaire,
+        user_id,
+    )
 
 
-async def lister_commentaires(db: AsyncIOMotorDatabase, event_id: ObjectId) -> list[dict]:
-    return await db.comments.find({"event_id": event_id}).sort("created_at", 1).to_list(length=None)
+async def lister_commentaires(
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+    user_id: ObjectId,
+) -> list[dict]:
+    commentaires = await db.comments.find(
+        {"event_id": event_id}
+    ).sort(
+        "created_at",
+        1,
+    ).to_list(length=None)
+
+    resultats = []
+
+    for commentaire in commentaires:
+        resultats.append(
+            await _to_public_comment(
+                db,
+                commentaire,
+                user_id,
+            )
+        )
+
+    return resultats
+
+
+async def toggle_comment_reaction(
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+    comment_id: ObjectId,
+    user_id: ObjectId,
+    reaction_type: str,
+) -> dict:
+    commentaire = await db.comments.find_one(
+        {
+            "_id": comment_id,
+            "event_id": event_id,
+        }
+    )
+
+    if commentaire is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Commentaire introuvable",
+        )
+
+    reaction_type = reaction_type.strip()
+
+    if not reaction_type:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le type de réaction ne peut pas être vide",
+        )
+
+    existing_reaction = await db.comment_reactions.find_one(
+        {
+            "comment_id": comment_id,
+            "user_id": user_id,
+        }
+    )
+
+    if existing_reaction is None:
+        await db.comment_reactions.insert_one(
+            {
+                "event_id": event_id,
+                "comment_id": comment_id,
+                "user_id": user_id,
+                "reaction_type": reaction_type,
+                "created_at": datetime.now(timezone.utc),
+            }
+        )
+
+    elif existing_reaction["reaction_type"] == reaction_type:
+        await db.comment_reactions.delete_one(
+            {
+                "_id": existing_reaction["_id"],
+            }
+        )
+
+    else:
+        await db.comment_reactions.update_one(
+            {
+                "_id": existing_reaction["_id"],
+            },
+            {
+                "$set": {
+                    "reaction_type": reaction_type,
+                    "created_at": datetime.now(timezone.utc),
+                }
+            },
+        )
+
+    updated_comment = await db.comments.find_one(
+        {"_id": comment_id}
+    )
+
+    return await _to_public_comment(
+        db,
+        updated_comment,
+        user_id,
+    )
+
+
+async def _to_public_comment(
+    db: AsyncIOMotorDatabase,
+    commentaire: dict,
+    user_id: ObjectId,
+) -> dict:
+    reaction_counts = await (
+        db.comment_reactions.aggregate(
+            [
+                {
+                    "$match": {
+                        "comment_id": commentaire["_id"],
+                    }
+                },
+                {
+                    "$group": {
+                        "_id": "$reaction_type",
+                        "count": {"$sum": 1},
+                    }
+                },
+            ]
+        ).to_list(length=None)
+    )
+
+    reactions = {
+        reaction["_id"]: reaction["count"]
+        for reaction in reaction_counts
+    }
+
+    user_reaction_doc = await db.comment_reactions.find_one(
+        {
+            "comment_id": commentaire["_id"],
+            "user_id": user_id,
+        }
+    )
+
+    user_reaction = (
+        user_reaction_doc["reaction_type"]
+        if user_reaction_doc
+        else None
+    )
+
+    return {
+        **commentaire,
+        "reactions": reactions,
+        "user_reaction": user_reaction,
+    }
 
 
 # ---------------------------------------------------------------------------
 
 async def _to_public_event(
-    db: AsyncIOMotorDatabase, event_id: ObjectId, user_id: ObjectId, event_doc: dict | None = None
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+    user_id: ObjectId,
+    event_doc: dict | None = None,
 ) -> dict | None:
-    event = event_doc or await db.events.find_one({"_id": event_id})
+    event = event_doc or await db.events.find_one(
+        {"_id": event_id}
+    )
+
     if event is None:
         return None
 
-    auteur = await db.users.find_one({"_id": event["auteur_id"]})
-    statut_doc = await db.event_statuses.find_one({"event_id": event["_id"], "user_id": user_id})
-    nombre_commentaires = await db.comments.count_documents({"event_id": event["_id"]})
+    auteur = await db.users.find_one(
+        {"_id": event["auteur_id"]}
+    )
+
+    statut_doc = await db.event_statuses.find_one(
+        {
+            "event_id": event["_id"],
+            "user_id": user_id,
+        }
+    )
+
+    nombre_commentaires = await db.comments.count_documents(
+        {"event_id": event["_id"]}
+    )
 
     vues = event.get("vues", 0)
 
     reaction_counts = await (
         db.event_reactions.aggregate(
             [
-                {"$match": {"event_id": event["_id"]}},
+                {
+                    "$match": {
+                        "event_id": event["_id"],
+                    }
+                },
                 {
                     "$group": {
                         "_id": "$reaction_type",
@@ -173,8 +428,17 @@ async def _to_public_event(
             "photo_url": auteur.get("photo_url"),
         }
         if auteur
-        else {"user_id": event["auteur_id"], "prenom": "?", "nom": "", "photo_url": None},
-        "mon_statut": statut_doc["statut"] if statut_doc else None,
+        else {
+            "user_id": event["auteur_id"],
+            "prenom": "?",
+            "nom": "",
+            "photo_url": None,
+        },
+        "mon_statut": (
+            statut_doc["statut"]
+            if statut_doc
+            else None
+        ),
         "nombre_commentaires": nombre_commentaires,
         "vues": vues,
         "reactions": reactions,
