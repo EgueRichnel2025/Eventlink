@@ -25,3 +25,4 @@ backend/firebase-credentials.json
 
 # Event uploads (runtime files)
 backend/uploads/
+backend/openapi.json
