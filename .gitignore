@@ -22,3 +22,6 @@ backend/.venv/
 backend/venv/
 backend/.pytest_cache/
 backend/firebase-credentials.json
+
+# Event uploads (runtime files)
+backend/uploads/
