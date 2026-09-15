@@ -28,7 +28,10 @@ class _GroupeChoiceScreenState extends State<GroupeChoiceScreen> {
   @override
   void initState() {
     super.initState();
-    _checkIfHasGroups();
+
+    if (!widget.depuisGroupesScreen) {
+      _checkIfHasGroups();
+    }
   }
 
   Future<void> _checkIfHasGroups() async {
@@ -44,8 +47,7 @@ class _GroupeChoiceScreenState extends State<GroupeChoiceScreen> {
 
       if (!mounted) return;
 
-      if (groupProvider.groupes.isNotEmpty &&
-          widget.depuisGroupesScreen) {
+      if (groupProvider.groupes.isNotEmpty) {
         Navigator.of(context).pushReplacementNamed(
           AppRoutes.groupesScreen,
         );
@@ -64,7 +66,9 @@ class _GroupeChoiceScreenState extends State<GroupeChoiceScreen> {
     if (!context.mounted) return;
 
     if (groupeCree == true) {
-      Navigator.of(context).pushReplacementNamed('/groupes');
+      Navigator.of(context).pushReplacementNamed(
+        AppRoutes.groupesScreen,
+      );
     }
   }
 
@@ -79,7 +83,9 @@ class _GroupeChoiceScreenState extends State<GroupeChoiceScreen> {
     if (!context.mounted) return;
 
     if (rejoint == true) {
-      Navigator.of(context).pushReplacementNamed('/groupes');
+      Navigator.of(context).pushReplacementNamed(
+        AppRoutes.groupesScreen,
+      );
     }
   }
 
@@ -104,8 +110,36 @@ class _GroupeChoiceScreenState extends State<GroupeChoiceScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    if (widget.depuisGroupesScreen)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(
+                            Icons.arrow_back_rounded,
+                            color: Colors.white,
+                          ),
+                          label: const Text(
+                            'Retour',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: IconButton.styleFrom(
+                            backgroundColor:
+                                Colors.black.withValues(alpha: 0.25),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.sm,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    const Spacer(),
+
                     Container(
                       width: 100,
                       height: 100,
@@ -135,7 +169,9 @@ class _GroupeChoiceScreenState extends State<GroupeChoiceScreen> {
                         ),
                       ),
                     ),
+
                     const SizedBox(height: AppSpacing.lg),
+
                     Text(
                       'Que souhaitez-vous faire ?',
                       style:
@@ -143,18 +179,22 @@ class _GroupeChoiceScreenState extends State<GroupeChoiceScreen> {
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                               ),
+                      textAlign: TextAlign.center,
                     ),
+
                     const SizedBox(height: AppSpacing.sm),
+
                     Text(
                       'Créez un groupe pour votre communauté, ou rejoignez-en un avec un code d\'invitation.',
                       style:
                           Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color:
-                                    Colors.white.withValues(alpha: 0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                               ),
                       textAlign: TextAlign.center,
                     ),
+
                     const SizedBox(height: AppSpacing.xl),
+
                     Column(
                       children: [
                         SizedBox(
@@ -198,16 +238,15 @@ class _GroupeChoiceScreenState extends State<GroupeChoiceScreen> {
                         ),
                       ],
                     ),
-                    const Spacer(flex: 2),
+
+                    const Spacer(),
+
                     if (widget.depuisGroupesScreen)
-                      Align(
-                        alignment: Alignment.bottomCenter,
-                        child: TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text(
-                            'Retour',
-                            style: TextStyle(color: Colors.white70),
-                          ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text(
+                          'Retour',
+                          style: TextStyle(color: Colors.white70),
                         ),
                       ),
                   ],
