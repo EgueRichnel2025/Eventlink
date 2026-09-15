@@ -4,11 +4,13 @@ Point d'entrée de l'API EventLink.
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config.settings import settings
 from app.database.mongodb import close_mongo_connection, connect_to_mongo
@@ -17,6 +19,14 @@ from app.services.notification_service import init_firebase
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("eventlink")
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+UPLOADS_DIR = BASE_DIR / "uploads"
+EVENT_UPLOADS_DIR = UPLOADS_DIR / "events"
+
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -54,6 +64,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+app.mount(
+    "/uploads",
+    StaticFiles(directory=str(UPLOADS_DIR)),
+    name="uploads",
+)
 
 
 app.include_router(auth_routes.router)

@@ -1,5 +1,17 @@
+from pathlib import Path
+from uuid import uuid4
+
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.database.mongodb import get_database
@@ -18,26 +30,153 @@ from app.utils.dependencies import get_current_user, get_current_user_id
 router = APIRouter(tags=["Événements"])
 
 
-async def _verifier_membre(db: AsyncIOMotorDatabase, group_id: ObjectId, user_id: ObjectId) -> dict:
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+EVENT_UPLOADS_DIR = BASE_DIR / "uploads" / "events"
+EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+
+ALLOWED_IMAGE_EXTENSIONS = {
+    ".jpg": ".jpg",
+    ".jpeg": ".jpg",
+    ".png": ".png",
+    ".webp": ".webp",
+}
+
+MAX_IMAGE_SIZE = 10 * 1024 * 1024
+
+
+async def _verifier_membre(
+    db: AsyncIOMotorDatabase,
+    group_id: ObjectId,
+    user_id: ObjectId,
+) -> dict:
     """Vérifie l'appartenance au groupe pour des identifiants passés en query/déduits d'un event.
 
     Utilisé partout où le group_id ne provient pas d'un paramètre de chemin nommé
     `group_id` (auquel cas `require_group_member` de dependencies.py suffit).
     """
-    membership = await db.group_members.find_one({"group_id": group_id, "user_id": user_id})
+    membership = await db.group_members.find_one(
+        {
+            "group_id": group_id,
+            "user_id": user_id,
+        }
+    )
+
     if membership is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Vous n'êtes pas membre de ce groupe")
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
+
     return membership
 
 
-@router.post("/events", response_model=EventPublic, status_code=status.HTTP_201_CREATED)
+@router.post("/events/upload", response_model=dict)
+async def uploader_image_event(
+    request: Request,
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+):
+    """Upload une image destinée à être utilisée par un événement."""
+
+    print(
+        f"[UPLOAD] fichier={file.filename!r} "
+        f"content_type={file.content_type!r}"
+    )
+
+    content_type = file.content_type
+    extension = None
+
+    if content_type in ALLOWED_IMAGE_TYPES:
+        extension = ALLOWED_IMAGE_TYPES[content_type]
+    else:
+        nom_fichier = file.filename or ""
+        extension_fichier = Path(nom_fichier).suffix.lower()
+
+        if extension_fichier in ALLOWED_IMAGE_EXTENSIONS:
+            extension = ALLOWED_IMAGE_EXTENSIONS[extension_fichier]
+            print(
+                f"[UPLOAD] MIME non standard, "
+                f"extension reconnue : {extension_fichier!r}"
+            )
+        else:
+            print(
+                f"[UPLOAD] FORMAT REFUSÉ : "
+                f"content_type={content_type!r}, "
+                f"extension={extension_fichier!r}"
+            )
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Format d'image non supporté. Utilisez JPG, PNG ou WebP.",
+            )
+
+    contenu = await file.read()
+
+    print(
+        f"[UPLOAD] taille={len(contenu)} octets "
+        f"extension={extension!r}"
+    )
+
+    if not contenu:
+        print("[UPLOAD] FICHIER VIDE")
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le fichier image est vide.",
+        )
+
+    if len(contenu) > MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            "L'image ne doit pas dépasser 10 Mo.",
+        )
+
+    nom_fichier = f"{uuid4().hex}{extension}"
+    chemin_fichier = EVENT_UPLOADS_DIR / nom_fichier
+
+    try:
+        chemin_fichier.write_bytes(contenu)
+    except OSError as exc:
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "Impossible d'enregistrer l'image.",
+        ) from exc
+
+    base_url = str(request.base_url).rstrip("/")
+    image_url = f"{base_url}/uploads/events/{nom_fichier}"
+
+    print(
+        f"[UPLOAD] SUCCÈS : {image_url}"
+    )
+
+    return {
+        "success": True,
+        "image_url": image_url,
+        "filename": nom_fichier,
+    }
+
+
+@router.post(
+    "/events",
+    response_model=EventPublic,
+    status_code=status.HTTP_201_CREATED,
+)
 async def creer_event(
     payload: CreerEventRequest,
     groupe_id: str = Query(..., alias="groupe_id"),
     user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    await _verifier_membre(db, ObjectId(groupe_id), user["_id"])
+    await _verifier_membre(
+        db,
+        ObjectId(groupe_id),
+        user["_id"],
+    )
+
     event = await event_service.creer_event(
         db,
         group_id=ObjectId(groupe_id),
@@ -55,13 +194,19 @@ async def creer_event(
         type_notif="nouvel_evenement",
         titre="Nouvel événement",
         corps=f"{user['prenom']} a ajouté une nouvelle opportunité.",
-        data={"event_id": str(event["_id"]), "group_id": groupe_id},
+        data={
+            "event_id": str(event["_id"]),
+            "group_id": groupe_id,
+        },
     )
 
     return EventPublic.model_validate(event)
 
 
-@router.get("/events", response_model=list[EventPublic])
+@router.get(
+    "/events",
+    response_model=list[EventPublic],
+)
 async def lister_events(
     groupe_id: str = Query(..., alias="groupe_id"),
     categorie: str | None = None,
@@ -70,95 +215,199 @@ async def lister_events(
     user_id: str = Depends(get_current_user_id),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    await _verifier_membre(db, ObjectId(groupe_id), ObjectId(user_id))
-    events = await event_service.lister_events(
-        db, ObjectId(groupe_id), ObjectId(user_id), categorie=categorie, statut=statut, recherche=q
+    await _verifier_membre(
+        db,
+        ObjectId(groupe_id),
+        ObjectId(user_id),
     )
-    return [EventPublic.model_validate(e) for e in events]
+
+    events = await event_service.lister_events(
+        db,
+        ObjectId(groupe_id),
+        ObjectId(user_id),
+        categorie=categorie,
+        statut=statut,
+        recherche=q,
+    )
+
+    return [
+        EventPublic.model_validate(e)
+        for e in events
+    ]
 
 
-@router.get("/events/{event_id}", response_model=EventPublic)
+@router.get(
+    "/events/{event_id}",
+    response_model=EventPublic,
+)
 async def obtenir_event(
     event_id: str,
     user_id: str = Depends(get_current_user_id),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    # require_group_member a besoin du group_id dans le path : on le déduit de l'event.
-    event = await event_service.obtenir_event(db, ObjectId(event_id), ObjectId(user_id))
-    membership = await db.group_members.find_one(
-        {"group_id": event["group_id"], "user_id": ObjectId(user_id)}
+    event = await event_service.obtenir_event(
+        db,
+        ObjectId(event_id),
+        ObjectId(user_id),
     )
+
+    membership = await db.group_members.find_one(
+        {
+            "group_id": event["group_id"],
+            "user_id": ObjectId(user_id),
+        }
+    )
+
     if membership is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Vous n'êtes pas membre de ce groupe")
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
+
     return EventPublic.model_validate(event)
 
 
-@router.put("/events/{event_id}", response_model=dict)
+@router.put(
+    "/events/{event_id}",
+    response_model=dict,
+)
 async def modifier_event(
     event_id: str,
     payload: ModifierEventRequest,
     user_id: str = Depends(get_current_user_id),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    event = await db.events.find_one({"_id": ObjectId(event_id)})
+    event = await db.events.find_one(
+        {"_id": ObjectId(event_id)}
+    )
+
     if event is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Événement introuvable")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
     if str(event["auteur_id"]) != user_id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Seul l'auteur peut modifier cet événement")
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Seul l'auteur peut modifier cet événement",
+        )
 
     updates = payload.model_dump()
+
     if updates.get("lien") is not None:
         updates["lien"] = str(updates["lien"])
-    if updates.get("categorie") is not None:
-        updates["categorie"] = updates["categorie"].value if hasattr(updates["categorie"], "value") else updates["categorie"]
 
-    await event_service.modifier_event(db, ObjectId(event_id), updates)
+    if updates.get("categorie") is not None:
+        updates["categorie"] = (
+            updates["categorie"].value
+            if hasattr(updates["categorie"], "value")
+            else updates["categorie"]
+        )
+
+    await event_service.modifier_event(
+        db,
+        ObjectId(event_id),
+        updates,
+    )
+
     return {"success": True}
 
 
-@router.delete("/events/{event_id}", response_model=dict)
+@router.delete(
+    "/events/{event_id}",
+    response_model=dict,
+)
 async def supprimer_event(
     event_id: str,
     user_id: str = Depends(get_current_user_id),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    event = await db.events.find_one({"_id": ObjectId(event_id)})
+    event = await db.events.find_one(
+        {"_id": ObjectId(event_id)}
+    )
+
     if event is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Événement introuvable")
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
 
     membership = await db.group_members.find_one(
-        {"group_id": event["group_id"], "user_id": ObjectId(user_id)}
+        {
+            "group_id": event["group_id"],
+            "user_id": ObjectId(user_id),
+        }
     )
-    est_auteur = str(event["auteur_id"]) == user_id
-    est_admin = membership is not None and membership["role"] in ("owner", "admin")
-    if not (est_auteur or est_admin):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Action non autorisée")
 
-    await event_service.supprimer_event(db, ObjectId(event_id))
+    est_auteur = str(event["auteur_id"]) == user_id
+
+    est_admin = (
+        membership is not None
+        and membership["role"] in ("owner", "admin")
+    )
+
+    if not (est_auteur or est_admin):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Action non autorisée",
+        )
+
+    await event_service.supprimer_event(
+        db,
+        ObjectId(event_id),
+    )
+
     return {"success": True}
 
 
-@router.patch("/events/{event_id}/statut", response_model=dict)
+@router.patch(
+    "/events/{event_id}/statut",
+    response_model=dict,
+)
 async def changer_statut(
     event_id: str,
     payload: ChangerStatutRequest,
     user_id: str = Depends(get_current_user_id),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    event = await db.events.find_one({"_id": ObjectId(event_id)})
-    if event is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Événement introuvable")
-    membership = await db.group_members.find_one(
-        {"group_id": event["group_id"], "user_id": ObjectId(user_id)}
+    event = await db.events.find_one(
+        {"_id": ObjectId(event_id)}
     )
-    if membership is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Vous n'êtes pas membre de ce groupe")
 
-    await event_service.changer_statut(db, ObjectId(event_id), ObjectId(user_id), payload.statut.value)
+    if event is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
+    membership = await db.group_members.find_one(
+        {
+            "group_id": event["group_id"],
+            "user_id": ObjectId(user_id),
+        }
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
+
+    await event_service.changer_statut(
+        db,
+        ObjectId(event_id),
+        ObjectId(user_id),
+        payload.statut.value,
+    )
+
     return {"success": True}
 
 
-@router.post("/events/{event_id}/reactions", response_model=dict)
+@router.post(
+    "/events/{event_id}/reactions",
+    response_model=dict,
+)
 async def add_reaction(
     event_id: str,
     payload: ReactionRequest,
@@ -204,12 +453,14 @@ async def add_reaction(
                 "reaction_type": reaction_type,
             }
         )
+
     elif existing_reaction["reaction_type"] == reaction_type:
         await db.event_reactions.delete_one(
             {
                 "_id": existing_reaction["_id"],
             }
         )
+
     else:
         await db.event_reactions.update_one(
             {
@@ -233,7 +484,10 @@ async def add_reaction(
     ).model_dump()
 
 
-@router.post("/events/{event_id}/views", response_model=dict)
+@router.post(
+    "/events/{event_id}/views",
+    response_model=dict,
+)
 async def increment_views(
     event_id: str,
     user_id: str = Depends(get_current_user_id),
@@ -280,42 +534,90 @@ async def increment_views(
     ).model_dump()
 
 
-@router.get("/events/{event_id}/commentaires", response_model=list[CommentairePublic])
+@router.get(
+    "/events/{event_id}/commentaires",
+    response_model=list[CommentairePublic],
+)
 async def lister_commentaires(
     event_id: str,
     user_id: str = Depends(get_current_user_id),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    event = await db.events.find_one({"_id": ObjectId(event_id)})
-    if event is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Événement introuvable")
-    membership = await db.group_members.find_one(
-        {"group_id": event["group_id"], "user_id": ObjectId(user_id)}
+    event = await db.events.find_one(
+        {"_id": ObjectId(event_id)}
     )
+
+    if event is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
+    membership = await db.group_members.find_one(
+        {
+            "group_id": event["group_id"],
+            "user_id": ObjectId(user_id),
+        }
+    )
+
     if membership is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Vous n'êtes pas membre de ce groupe")
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
 
-    commentaires = await event_service.lister_commentaires(db, ObjectId(event_id))
-    return [CommentairePublic.model_validate(c) for c in commentaires]
+    commentaires = await event_service.lister_commentaires(
+        db,
+        ObjectId(event_id),
+        ObjectId(user_id),
+    )
+
+    return [
+        CommentairePublic.model_validate(c)
+        for c in commentaires
+    ]
 
 
-@router.post("/events/{event_id}/commentaires", response_model=CommentairePublic, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/events/{event_id}/commentaires",
+    response_model=CommentairePublic,
+    status_code=status.HTTP_201_CREATED,
+)
 async def ajouter_commentaire(
     event_id: str,
     payload: CommentaireRequest,
     user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    event = await db.events.find_one({"_id": ObjectId(event_id)})
-    if event is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Événement introuvable")
-    membership = await db.group_members.find_one(
-        {"group_id": event["group_id"], "user_id": user["_id"]}
+    event = await db.events.find_one(
+        {"_id": ObjectId(event_id)}
     )
-    if membership is None:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Vous n'êtes pas membre de ce groupe")
 
-    commentaire = await event_service.ajouter_commentaire(db, ObjectId(event_id), user["_id"], payload.texte)
+    if event is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
+    membership = await db.group_members.find_one(
+        {
+            "group_id": event["group_id"],
+            "user_id": user["_id"],
+        }
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
+
+    commentaire = await event_service.ajouter_commentaire(
+        db,
+        ObjectId(event_id),
+        user["_id"],
+        payload.texte,
+    )
 
     await notification_service.notifier_membres_groupe(
         db,
@@ -324,7 +626,55 @@ async def ajouter_commentaire(
         type_notif="nouveau_commentaire",
         titre="Nouveau commentaire",
         corps=f"{user['prenom']} a commenté un événement.",
-        data={"event_id": event_id, "group_id": str(event["group_id"])},
+        data={
+            "event_id": event_id,
+            "group_id": str(event["group_id"]),
+        },
+    )
+
+    return CommentairePublic.model_validate(commentaire)
+
+
+@router.post(
+    "/events/{event_id}/commentaires/{comment_id}/reactions",
+    response_model=CommentairePublic,
+)
+async def toggle_comment_reaction(
+    event_id: str,
+    comment_id: str,
+    payload: ReactionRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    event = await db.events.find_one(
+        {"_id": ObjectId(event_id)}
+    )
+
+    if event is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
+    membership = await db.group_members.find_one(
+        {
+            "group_id": event["group_id"],
+            "user_id": user["_id"],
+        }
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
+
+    commentaire = await event_service.toggle_comment_reaction(
+        db,
+        ObjectId(event_id),
+        ObjectId(comment_id),
+        user["_id"],
+        payload.type,
     )
 
     return CommentairePublic.model_validate(commentaire)
