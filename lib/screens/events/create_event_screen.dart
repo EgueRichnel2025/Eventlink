@@ -30,6 +30,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
   bool _enCours = false;
   bool _isUploading = false;
 
+  static const int _maxDescriptionLength = 1000;
+
   @override
   void dispose() {
     _lienController.dispose();
@@ -86,7 +88,8 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Erreur lors de l\'upload de l\'image: ${response['message']}',
+              'Erreur lors de l\'upload de l\'image: '
+              '${response['detail'] ?? response['message'] ?? 'Erreur inconnue'}',
             ),
           ),
         );
@@ -127,9 +130,12 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
 
       if (!mounted) return;
 
-      if (uploadedUrl != null) {
-        _imageUrl = uploadedUrl;
+      if (uploadedUrl == null) {
+        setState(() => _enCours = false);
+        return;
       }
+
+      _imageUrl = uploadedUrl;
     }
 
     final events = context.read<EventProvider>();
@@ -176,6 +182,10 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
       return 'La description est obligatoire';
     }
 
+    if (value.length > _maxDescriptionLength) {
+      return 'La description ne peut pas dépasser 1000 caractères';
+    }
+
     final wordCount = value
         .trim()
         .split(RegExp(r'\s+'))
@@ -187,6 +197,58 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     }
 
     return null;
+  }
+
+  void _afficherApercuImage() {
+    if (_image == null) return;
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(16),
+          child: Stack(
+            children: [
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: InteractiveViewer(
+                    minScale: 0.8,
+                    maxScale: 4,
+                    child: Image.file(
+                      _image!,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Material(
+                  color: Colors.black54,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(
+                        Icons.close_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -206,12 +268,42 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
         child: SafeArea(
           child: CustomScrollView(
             slivers: [
-              const SliverAppBar(
-                title: Text('Créer un événement'),
+              SliverAppBar(
+                leading: Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: AppColors.textPrimary,
+                    ),
+                    tooltip: 'Retour',
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.primarySurface,
+                      foregroundColor: AppColors.textPrimary,
+                      padding: const EdgeInsets.all(9),
+                      minimumSize: const Size(42, 42),
+                      maximumSize: const Size(42, 42),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                title: const Text(
+                  'Créer un événement',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 floating: true,
                 snap: true,
-                backgroundColor: Colors.transparent,
-                elevation: 0,
+                backgroundColor: Colors.white.withValues(alpha: 0.94),
+                foregroundColor: AppColors.textPrimary,
+                elevation: 3,
+                shadowColor: Colors.black.withValues(alpha: 0.15),
+                surfaceTintColor: Colors.transparent,
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -224,7 +316,13 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                       children: [
                         Text(
                           'Type d\'événement',
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Wrap(
@@ -258,12 +356,23 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         const SizedBox(height: AppSpacing.lg),
                         Text(
                           'Renseigner le lien de l\'événement',
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         TextFormField(
                           controller: _lienController,
                           keyboardType: TextInputType.url,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                          ),
+                          cursorColor: AppColors.primary,
                           decoration: const InputDecoration(
                             labelText: 'Lien de l\'événement',
                             hintText: 'https://example.com/evenement',
@@ -273,16 +382,29 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                         const SizedBox(height: AppSpacing.md),
                         Text(
                           'Description de l\'événement',
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         TextFormField(
                           controller: _descriptionController,
                           maxLines: 4,
+                          maxLength: _maxDescriptionLength,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                          ),
+                          cursorColor: AppColors.primary,
                           decoration: const InputDecoration(
                             labelText: 'Description',
                             hintText:
                                 'Décrivez l\'événement en détail (minimum 10 mots)',
+                            counterText: '',
                           ),
                           validator: _validerDescription,
                           onChanged: (_) {
@@ -296,24 +418,55 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                           Padding(
                             padding:
                                 const EdgeInsets.only(top: AppSpacing.sm),
-                            child: Text(
-                              '${_descriptionController.text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length}/10 mots minimum',
-                              style: TextStyle(
-                                color: _validerDescription(
-                                          _descriptionController.text,
-                                        ) ==
-                                        null
-                                    ? AppColors.success
-                                    : AppColors.error,
-                                fontSize: 12,
-                              ),
-                              textAlign: TextAlign.end,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _validerDescription(
+                                              _descriptionController.text,
+                                            ) ==
+                                            null
+                                        ? 'Description valide'
+                                        : 'Minimum 10 mots requis',
+                                    style: TextStyle(
+                                      color: _validerDescription(
+                                                _descriptionController.text,
+                                              ) ==
+                                              null
+                                          ? AppColors.success
+                                          : AppColors.error,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.sm),
+                                Text(
+                                  '${_descriptionController.text.length}/$_maxDescriptionLength caractères',
+                                  style: TextStyle(
+                                    color: _descriptionController.text.length >=
+                                            _maxDescriptionLength
+                                        ? AppColors.error
+                                        : AppColors.textSecondary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.end,
+                                ),
+                              ],
                             ),
                           ),
                         const SizedBox(height: AppSpacing.lg),
                         Text(
                           'Ajouter l\'image de l\'événement',
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         GestureDetector(
@@ -387,6 +540,46 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                                                 Icons.close,
                                                 color: Colors.white,
                                                 size: 22,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        bottom: 10,
+                                        left: 10,
+                                        child: Material(
+                                          color: Colors.black54,
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          child: InkWell(
+                                            onTap: _afficherApercuImage,
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            child: const Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 8,
+                                              ),
+                                              child: Row(
+                                                mainAxisSize:
+                                                    MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.visibility_rounded,
+                                                    color: Colors.white,
+                                                    size: 18,
+                                                  ),
+                                                  SizedBox(width: 6),
+                                                  Text(
+                                                    'Aperçu',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           ),
