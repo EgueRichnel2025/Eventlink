@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/theme.dart';
 import '../../providers/group_provider.dart';
+import '../../routes/app_routes.dart';
 import '../../services/group_service.dart';
 
 class GroupSettingsScreen extends StatefulWidget {
@@ -15,10 +16,12 @@ class GroupSettingsScreen extends StatefulWidget {
 
 class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   late final TextEditingController _nomController;
+
   bool _enCours = false;
   bool _transfertEnCours = false;
   bool _promotionEnCours = false;
   bool _demotionEnCours = false;
+
   String? _nouveauProprioId;
   String? _adminAPromouvoirId;
   String? _adminARetrograderId;
@@ -26,8 +29,12 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   @override
   void initState() {
     super.initState();
+
     final groupe = context.read<GroupProvider>().groupeCourant;
-    _nomController = TextEditingController(text: groupe?.nom ?? '');
+
+    _nomController = TextEditingController(
+      text: groupe?.nom ?? '',
+    );
   }
 
   @override
@@ -36,11 +43,29 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     super.dispose();
   }
 
+  void _retour() {
+    final navigator = Navigator.of(context);
+
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+
+    navigator.pushReplacementNamed(
+      AppRoutes.groupMembers,
+    );
+  }
+
   Future<void> _copierCode(String code) async {
-    await Clipboard.setData(ClipboardData(text: code));
+    await Clipboard.setData(
+      ClipboardData(text: code),
+    );
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Code copié !')),
+        const SnackBar(
+          content: Text('Code copié !'),
+        ),
       );
     }
   }
@@ -48,25 +73,74 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
   Future<void> _enregistrer() async {
     final groupProvider = context.read<GroupProvider>();
     final groupe = groupProvider.groupeCourant;
+
     if (groupe == null) return;
 
     final nom = _nomController.text.trim();
-    if (nom.isEmpty || nom == groupe.nom) return;
+
+    if (nom.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Le nom du groupe ne peut pas être vide.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (nom == groupe.nom) {
+      _retour();
+      return;
+    }
 
     setState(() => _enCours = true);
 
-    await groupProvider.chargerMesGroupes();
+    try {
+      final groupService = GroupService();
 
-    if (!mounted) return;
+      await groupService.modifierGroupe(
+        groupe.id,
+        nom: nom,
+        photoUrl: groupe.photoUrl,
+      );
 
-    setState(() => _enCours = false);
+      final groupeMisAJour =
+          await groupService.obtenirGroupe(
+        groupe.id,
+      );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Groupe mis à jour')),
-    );
+      groupProvider.mettreAJourGroupeDansListe(
+        groupeMisAJour,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Groupe mis à jour'),
+        ),
+      );
+
+      _retour();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur : $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _enCours = false);
+      }
+    }
   }
 
-  Future<void> _transfererPropriete(String nouveauProprioId) async {
+  Future<void> _transfererPropriete(
+    String nouveauProprioId,
+  ) async {
     if (nouveauProprioId.isEmpty) return;
 
     final groupProvider = context.read<GroupProvider>();
@@ -89,24 +163,33 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         ownerId: nouveauProprioId,
       );
 
-      groupProvider.mettreAJourGroupeDansListe(groupeMisAJour);
+      groupProvider.mettreAJourGroupeDansListe(
+        groupeMisAJour,
+      );
 
-      if (groupProvider.groupeCourant?.id == groupeActuel.id) {
-        groupProvider.ouvrirGroupe(groupeMisAJour);
+      if (groupProvider.groupeCourant?.id ==
+          groupeActuel.id) {
+        groupProvider.ouvrirGroupe(
+          groupeMisAJour,
+        );
       }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Propriété transférée avec succès'),
+          content: Text(
+            'Propriété transférée avec succès',
+          ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e')),
+        SnackBar(
+          content: Text('Erreur : $e'),
+        ),
       );
     } finally {
       if (mounted) {
@@ -140,14 +223,18 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Administrateur promu avec succès'),
+          content: Text(
+            'Administrateur promu avec succès',
+          ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e')),
+        SnackBar(
+          content: Text('Erreur : $e'),
+        ),
       );
     } finally {
       if (mounted) {
@@ -181,14 +268,18 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Administrateur rétrogradé avec succès'),
+          content: Text(
+            'Administrateur rétrogradé avec succès',
+          ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : $e')),
+        SnackBar(
+          content: Text('Erreur : $e'),
+        ),
       );
     } finally {
       if (mounted) {
@@ -199,13 +290,30 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final groupe = context.watch<GroupProvider>().groupeCourant;
-    final estProprietaire = groupe?.estProprietaire ?? false;
-    final estAdmin = groupe?.estAdmin ?? false;
+    final groupe =
+        context.watch<GroupProvider>().groupeCourant;
+
+    final estProprietaire =
+        groupe?.estProprietaire ?? false;
+
+    final estAdmin =
+        groupe?.estAdmin ?? false;
 
     if (groupe == null) {
-      return const Scaffold(
-        body: Center(
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            onPressed: _retour,
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+            ),
+            tooltip: 'Retour',
+          ),
+          title: const Text(
+            'Paramètres du groupe',
+          ),
+        ),
+        body: const Center(
           child: Text('Groupe introuvable'),
         ),
       );
@@ -213,32 +321,102 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Paramètres du groupe'),
+        leading: IconButton(
+          onPressed: _retour,
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+          ),
+          tooltip: 'Retour à mon groupe',
+        ),
+        title: const Text(
+          'Paramètres du groupe',
+        ),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(
+          AppSpacing.lg,
+        ),
         children: [
-          TextField(
-            controller: _nomController,
-            enabled: estAdmin,
-            decoration: const InputDecoration(
-              labelText: 'Nom du groupe',
-            ),
+                TextField(
+    controller: _nomController,
+    enabled: estAdmin,
+    style: const TextStyle(
+        color: AppColors.textPrimary,
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+    ),
+    cursorColor: AppColors.primaryDark,
+    decoration: InputDecoration(
+      labelText: 'Nom du groupe',
+      labelStyle: const TextStyle(
+        color: AppColors.textSecondary,
+        fontWeight: FontWeight.w500,
+      ),
+      floatingLabelStyle: const TextStyle(
+        color: AppColors.primaryDark,
+        fontWeight: FontWeight.w600,
+      ),
+      enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(
+        AppRadius.button,
+      ),
+      borderSide: const BorderSide(
+        color: AppColors.textSecondary,
+        width: 1,
+      ),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(
+        AppRadius.button,
+      ),
+      borderSide: const BorderSide(
+        color: AppColors.primaryDark,
+        width: 2,
+      ),
+    ),
+    disabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(
+        AppRadius.button,
+      ),
+      borderSide: const BorderSide(
+        color: AppColors.textSecondary,
+        width: 1,
+      ),
+    ),
+  ),
+  ),
+
+          const SizedBox(
+            height: AppSpacing.lg,
           ),
-          const SizedBox(height: AppSpacing.lg),
+
           Text(
             'Code d\'invitation',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium,
           ),
-          const SizedBox(height: AppSpacing.sm),
+
+          const SizedBox(
+            height: AppSpacing.sm,
+          ),
+
           InkWell(
-            onTap: () => _copierCode(groupe.codeInvitation),
-            borderRadius: BorderRadius.circular(AppRadius.button),
+            onTap: () => _copierCode(
+              groupe.codeInvitation,
+            ),
+            borderRadius: BorderRadius.circular(
+              AppRadius.button,
+            ),
             child: Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
+              padding: const EdgeInsets.all(
+                AppSpacing.md,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.primarySurface,
-                borderRadius: BorderRadius.circular(AppRadius.button),
+                borderRadius: BorderRadius.circular(
+                  AppRadius.button,
+                ),
               ),
               child: Row(
                 children: [
@@ -259,23 +437,42 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
               ),
             ),
           ),
+
           if (estProprietaire) ...[
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(
+              height: AppSpacing.xl,
+            ),
+
             const Text(
               'Transférer la propriété',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Consumer<GroupProvider>(
-              builder: (context, provider, _) {
-                final membres = provider.membresDuGroupeCourant;
 
-                final membresSansProprietaire = membres
-                    .where((m) => m.userId != groupe.ownerId)
-                    .toList();
+            const SizedBox(
+              height: AppSpacing.sm,
+            ),
+
+            Consumer<GroupProvider>(
+              builder: (
+                context,
+                provider,
+                _,
+              ) {
+                final membres =
+                    provider.membresDuGroupeCourant;
+
+                final membresSansProprietaire =
+                    membres
+                        .where(
+                          (m) =>
+                              m.userId !=
+                              groupe.ownerId,
+                        )
+                        .toList();
 
                 if (membresSansProprietaire.isEmpty) {
                   return const Text(
@@ -287,119 +484,189 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                 }
 
                 return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.stretch,
                   children: [
                     DropdownButtonFormField<String>(
-                      initialValue: _nouveauProprioId,
-                      decoration: const InputDecoration(
-                        labelText: 'Sélectionner le nouveau propriétaire',
-                        border: OutlineInputBorder(),
+                      initialValue:
+                          _nouveauProprioId,
+                      decoration:
+                          const InputDecoration(
+                        labelText:
+                            'Sélectionner le nouveau propriétaire',
+                        border:
+                            OutlineInputBorder(),
                       ),
-                      items: membresSansProprietaire
-                          .map(
-                            (m) => DropdownMenuItem(
-                              value: m.userId,
-                              child: Text('${m.prenom} ${m.nom}'),
-                            ),
-                          )
-                          .toList(),
+                      items:
+                          membresSansProprietaire
+                              .map(
+                                (m) =>
+                                    DropdownMenuItem(
+                                  value:
+                                      m.userId,
+                                  child: Text(
+                                    '${m.prenom} ${m.nom}',
+                                  ),
+                                ),
+                              )
+                              .toList(),
                       onChanged: (value) {
                         setState(() {
-                          _nouveauProprioId = value;
+                          _nouveauProprioId =
+                              value;
                         });
                       },
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+
+                    const SizedBox(
+                      height: AppSpacing.sm,
+                    ),
+
                     ElevatedButton(
-                      onPressed: _transfertEnCours
-                          ? null
-                          : () => _transfererPropriete(
-                                _nouveauProprioId!,
-                              ),
+                      onPressed:
+                          _transfertEnCours ||
+                                  _nouveauProprioId ==
+                                      null
+                              ? null
+                              : () =>
+                                  _transfererPropriete(
+                                    _nouveauProprioId!,
+                                  ),
                       child: _transfertEnCours
                           ? const SizedBox(
                               width: 20,
                               height: 20,
-                              child: CircularProgressIndicator(
+                              child:
+                                  CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color:
+                                    Colors.white,
                               ),
                             )
-                          : const Text('Transférer la propriété'),
+                          : const Text(
+                              'Transférer la propriété',
+                            ),
                     ),
                   ],
                 );
               },
             ),
           ],
+
           if (estAdmin) ...[
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(
+              height: AppSpacing.xl,
+            ),
+
             const Text(
               'Gestion des administrateurs',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
+
+            const SizedBox(
+              height: AppSpacing.sm,
+            ),
+
             Consumer<GroupProvider>(
-              builder: (context, provider, _) {
-                final membres = provider.membresDuGroupeCourant;
+              builder: (
+                context,
+                provider,
+                _,
+              ) {
+                final membres =
+                    provider.membresDuGroupeCourant;
 
-                final administrateurs = membres
-                    .where((m) => m.role == 'admin')
-                    .toList();
+                final administrateurs =
+                    membres
+                        .where(
+                          (m) => m.role == 'admin',
+                        )
+                        .toList();
 
-                final membresSimples = membres
-                    .where((m) => m.role == 'member')
-                    .toList();
+                final membresSimples =
+                    membres
+                        .where(
+                          (m) => m.role == 'member',
+                        )
+                        .toList();
 
                 return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.stretch,
                   children: [
                     if (estProprietaire) ...[
                       const Text(
                         'Promouvoir un membre en administrateur',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                          fontWeight:
+                              FontWeight.w500,
+                          color:
+                              AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.xs),
+
+                      const SizedBox(
+                        height: AppSpacing.xs,
+                      ),
+
                       DropdownButtonFormField<String>(
-                        initialValue: _adminAPromouvoirId,
-                        decoration: const InputDecoration(
-                          labelText: 'Sélectionner un membre',
-                          border: OutlineInputBorder(),
+                        initialValue:
+                            _adminAPromouvoirId,
+                        decoration:
+                            const InputDecoration(
+                          labelText:
+                              'Sélectionner un membre',
+                          border:
+                              OutlineInputBorder(),
                         ),
                         items: membresSimples
                             .map(
-                              (m) => DropdownMenuItem(
-                                value: m.userId,
-                                child: Text('${m.prenom} ${m.nom}'),
+                              (m) =>
+                                  DropdownMenuItem(
+                                value:
+                                    m.userId,
+                                child: Text(
+                                  '${m.prenom} ${m.nom}',
+                                ),
                               ),
                             )
                             .toList(),
                         onChanged: (value) {
                           setState(() {
-                            _adminAPromouvoirId = value;
+                            _adminAPromouvoirId =
+                                value;
                           });
                         },
                       ),
-                      const SizedBox(height: AppSpacing.xs),
+
+                      const SizedBox(
+                        height: AppSpacing.xs,
+                      ),
+
                       ElevatedButton(
-                        onPressed: _promotionEnCours
-                            ? null
-                            : () => _promouvoirAdmin(
-                                  _adminAPromouvoirId!,
-                                ),
+                        onPressed:
+                            _promotionEnCours ||
+                                    _adminAPromouvoirId ==
+                                        null
+                                ? null
+                                : () =>
+                                    _promouvoirAdmin(
+                                      _adminAPromouvoirId!,
+                                    ),
                         child: _promotionEnCours
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(
+                                child:
+                                    CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color:
+                                      Colors.white,
                                 ),
                               )
                             : const Text(
@@ -407,53 +674,85 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
                               ),
                       ),
                     ],
+
                     if (administrateurs.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.md),
+                      const SizedBox(
+                        height: AppSpacing.md,
+                      ),
+
                       const Text(
                         'Rétrograder un administrateur en membre',
                         style: TextStyle(
                           fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                          fontWeight:
+                              FontWeight.w500,
+                          color:
+                              AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: AppSpacing.xs),
+
+                      const SizedBox(
+                        height: AppSpacing.xs,
+                      ),
+
                       DropdownButtonFormField<String>(
-                        initialValue: _adminARetrograderId,
-                        decoration: const InputDecoration(
-                          labelText: 'Sélectionner un administrateur',
-                          border: OutlineInputBorder(),
+                        initialValue:
+                            _adminARetrograderId,
+                        decoration:
+                            const InputDecoration(
+                          labelText:
+                              'Sélectionner un administrateur',
+                          border:
+                              OutlineInputBorder(),
                         ),
                         items: administrateurs
                             .map(
-                              (m) => DropdownMenuItem(
-                                value: m.userId,
-                                child: Text('${m.prenom} ${m.nom}'),
+                              (m) =>
+                                  DropdownMenuItem(
+                                value:
+                                    m.userId,
+                                child: Text(
+                                  '${m.prenom} ${m.nom}',
+                                ),
                               ),
                             )
                             .toList(),
                         onChanged: (value) {
                           setState(() {
-                            _adminARetrograderId = value;
+                            _adminARetrograderId =
+                                value;
                           });
                         },
                       ),
-                      const SizedBox(height: AppSpacing.xs),
+
+                      const SizedBox(
+                        height: AppSpacing.xs,
+                      ),
+
                       ElevatedButton(
-                        onPressed: _demotionEnCours
-                            ? null
-                            : () => _retrocederAdmin(
-                                  _adminARetrograderId!,
-                                ),
+                        onPressed:
+                            _demotionEnCours ||
+                                    _adminARetrograderId ==
+                                        null
+                                ? null
+                                : () =>
+                                    _retrocederAdmin(
+                                      _adminARetrograderId!,
+                                    ),
                         child: _demotionEnCours
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(
+                                child:
+                                    CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color:
+                                      Colors.white,
                                 ),
                               )
-                            : const Text('Rétrograder en membre'),
+                            : const Text(
+                                'Rétrograder en membre',
+                              ),
                       ),
                     ],
                   ],
@@ -461,19 +760,31 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
               },
             ),
           ],
-          const SizedBox(height: AppSpacing.xl),
+
+          const SizedBox(
+            height: AppSpacing.xl,
+          ),
+
           ElevatedButton(
-            onPressed: _enCours ? null : _enregistrer,
+            onPressed:
+                _enCours ? null : _enregistrer,
             child: _enCours
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(
+                    child:
+                        CircularProgressIndicator(
                       strokeWidth: 2,
                       color: Colors.white,
                     ),
                   )
-                : const Text('Enregistrer'),
+                : const Text(
+                    'Enregistrer',
+                  ),
+          ),
+
+          const SizedBox(
+            height: AppSpacing.lg,
           ),
         ],
       ),
