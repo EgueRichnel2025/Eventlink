@@ -7,7 +7,11 @@ class FiltresSheet extends StatefulWidget {
   final CategorieEvent? categorieInitiale;
   final StatutPersonnel? statutInitial;
 
-  const FiltresSheet({super.key, this.categorieInitiale, this.statutInitial});
+  const FiltresSheet({
+    super.key,
+    this.categorieInitiale,
+    this.statutInitial,
+  });
 
   @override
   State<FiltresSheet> createState() => _FiltresSheetState();
@@ -29,9 +33,16 @@ class _FiltresSheetState extends State<FiltresSheet> {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppRadius.sheet),
+        ),
       ),
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -40,42 +51,98 @@ class _FiltresSheetState extends State<FiltresSheet> {
             child: Container(
               width: 40,
               height: 4,
-              decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                color: AppColors.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
+
+          const SizedBox(height: AppSpacing.md),
+
+          // En-tête avec bouton retour
+          Row(
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(
+                  Icons.arrow_back_rounded,
+                  color: AppColors.textPrimary,
+                ),
+                tooltip: 'Retour',
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.primarySurface,
+                  foregroundColor: AppColors.textPrimary,
+                  padding: const EdgeInsets.all(9),
+                  minimumSize: const Size(42, 42),
+                  maximumSize: const Size(42, 42),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  'Filtrer les événements',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+            ],
+          ),
+
           const SizedBox(height: AppSpacing.lg),
-          Text('Filtrer les événements', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.lg),
-          Text('Catégorie', style: Theme.of(context).textTheme.titleMedium),
+
+          Text(
+            'Catégorie',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+
           const SizedBox(height: AppSpacing.sm),
+
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: CategorieEvent.values.map((c) {
               final selectionne = _categorie == c;
+
               return ChoiceChip(
                 label: Text('${c.emoji} ${c.label}'),
                 selected: selectionne,
-                onSelected: (_) => setState(() => _categorie = selectionne ? null : c),
+                onSelected: (_) => setState(
+                  () => _categorie = selectionne ? null : c,
+                ),
               );
             }).toList(),
           ),
+
           const SizedBox(height: AppSpacing.lg),
-          Text('Statut', style: Theme.of(context).textTheme.titleMedium),
+
+          Text(
+            'Statut',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+
           const SizedBox(height: AppSpacing.sm),
+
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: StatutPersonnel.values.map((s) {
               final selectionne = _statut == s;
+
               return ChoiceChip(
                 label: Text('${s.emoji} ${s.label}'),
                 selected: selectionne,
-                onSelected: (_) => setState(() => _statut = selectionne ? null : s),
+                onSelected: (_) => setState(
+                  () => _statut = selectionne ? null : s,
+                ),
               );
             }).toList(),
           ),
+
           const SizedBox(height: AppSpacing.xl),
+
           Row(
             children: [
               Expanded(
@@ -87,10 +154,15 @@ class _FiltresSheetState extends State<FiltresSheet> {
                   child: const Text('Réinitialiser'),
                 ),
               ),
+
               const SizedBox(width: AppSpacing.md),
+
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop({'categorie': _categorie, 'statut': _statut}),
+                  onPressed: () => Navigator.of(context).pop({
+                    'categorie': _categorie,
+                    'statut': _statut,
+                  }),
                   child: const Text('Appliquer'),
                 ),
               ),
