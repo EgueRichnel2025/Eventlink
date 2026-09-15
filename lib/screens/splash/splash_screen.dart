@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../config/app_config.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/group_provider.dart';
@@ -73,7 +74,9 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     final hasCompletedOnboarding =
-        await storage.hasCompletedOnboarding();
+        AppConfig.demoOnboarding
+            ? false
+            : await storage.hasCompletedOnboarding();
 
     if (!mounted) return;
 
