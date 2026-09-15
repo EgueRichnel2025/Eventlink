@@ -26,22 +26,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Notifications')),
+      appBar: AppBar(
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: AppColors.textPrimary,
+          ),
+          tooltip: 'Retour',
+        ),
+        title: const Text('Notifications'),
+      ),
       body: Consumer<NotificationProvider>(
         builder: (context, provider, _) {
           if (provider.isLoading && provider.notifications.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
           }
 
-          if (provider.errorMessage != null && provider.notifications.isEmpty) {
-            return ErrorRetryView(message: provider.errorMessage!, onRetry: provider.chargerNotifications);
+          if (provider.errorMessage != null &&
+              provider.notifications.isEmpty) {
+            return ErrorRetryView(
+              message: provider.errorMessage!,
+              onRetry: provider.chargerNotifications,
+            );
           }
 
           if (provider.notifications.isEmpty) {
             return const EmptyState(
               emoji: '🔔',
               titre: 'Aucune notification',
-              sousTitre: 'Vous serez averti des nouveaux événements et commentaires de vos groupes ici.',
+              sousTitre:
+                  'Vous serez averti des nouveaux événements et commentaires de vos groupes ici.',
             );
           }
 
@@ -50,21 +67,38 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.lg),
               itemCount: provider.notifications.length,
-              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+              separatorBuilder: (_, __) =>
+                  const SizedBox(height: AppSpacing.sm),
               itemBuilder: (context, index) {
                 final n = provider.notifications[index];
+
                 return Card(
-                  color: n.lu ? AppColors.surface : AppColors.primarySurface,
+                  color: n.lu
+                      ? AppColors.surface
+                      : AppColors.primarySurface,
                   child: ListTile(
-                    leading: const Icon(Icons.notifications_rounded, color: AppColors.primary),
-                    title: Text(n.titre, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    leading: const Icon(
+                      Icons.notifications_rounded,
+                      color: AppColors.primary,
+                    ),
+                    title: Text(
+                      n.titre,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     subtitle: Text(n.corps),
                     trailing: Text(
-                      DateFormat('d MMM · HH:mm', 'fr_FR').format(n.createdAt.toLocal()),
+                      DateFormat(
+                        'd MMM · HH:mm',
+                        'fr_FR',
+                      ).format(n.createdAt.toLocal()),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     onTap: () {
-                      if (!n.lu) provider.marquerCommeLue(n.id);
+                      if (!n.lu) {
+                        provider.marquerCommeLue(n.id);
+                      }
                     },
                   ),
                 );
