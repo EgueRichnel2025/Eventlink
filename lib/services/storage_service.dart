@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/api_config.dart';
+
 /// Stockage local sécurisé de la session (tokens) et préférences utilisateur.
 ///
 /// Utilise flutter_secure_storage (Keychain/Keystore) pour les données sensibles
@@ -162,15 +164,19 @@ class StorageService {
         response.statusCode < 300) {
       return responseData;
     } else {
-      throw Exception(
-        responseData['message'] ?? 'Erreur lors de l\'upload',
-      );
+      final message = responseData is Map<String, dynamic>
+          ? (responseData['detail'] ??
+              responseData['message'] ??
+              'Erreur lors de l\'upload')
+          : 'Erreur lors de l\'upload';
+
+      throw Exception(message);
     }
   }
 
   String _getBaseUrl() {
     // En développement, utilise l'IP locale
     // En production, utilise l'URL du serveur
-    return 'http://10.0.2.2:8000';
+    return ApiConfig.baseUrl;
   }
 }
