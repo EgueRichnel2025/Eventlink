@@ -414,8 +414,10 @@ class ApiService {
         return _extraireDetail(response) ??
             'Ressource introuvable.';
 
-      case 422:
-        return 'Certaines informations saisies sont invalides.';
+      case 422:  
+        return _extraireDetailValidation(response) ??
+            _extraireDetail(response) ??
+            'Certaines informations saisies sont invalides.';
 
       case 500:
       case 502:
@@ -430,11 +432,63 @@ class ApiService {
 
   String? _extraireDetail(http.Response response) {
     try {
-      final data = jsonDecode(response.body);
+      final data = jsonDecode(
+        utf8.decode(response.bodyBytes),
+      );
 
       if (data is Map &&
           data['detail'] is String) {
         return data['detail'] as String;
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  String? _extraireDetailValidation(http.Response response) {
+    try {
+      final data = jsonDecode(
+        utf8.decode(response.bodyBytes),
+      );
+
+      if (data is! Map || data['detail'] == null) {
+        return null;
+      }
+
+      final detail = data['detail'];
+
+      if (detail is String) {
+        return detail;
+      }
+
+      if (detail is List) {
+        final erreurs = <String>[];
+
+        for (final erreur in detail) {
+          if (erreur is! Map) continue;
+
+          final message = erreur['msg']?.toString();
+          final location = erreur['loc'];
+
+          if (message == null || message.isEmpty) {
+            continue;
+          }
+
+          if (location is List && location.length > 1) {
+            final champs = location
+                .skip(1)
+                .map((element) => element.toString())
+                .join('.');
+
+            erreurs.add('$champs : $message');
+          } else {
+            erreurs.add(message);
+          }
+        }
+
+        if (erreurs.isNotEmpty) {
+          return erreurs.join('\n');
+        }
       }
     } catch (_) {}
 
