@@ -1,111 +1,350 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/stored_account.dart';
 import '../models/user_model.dart';
 import '../services/api_exception.dart';
 import '../services/auth_service.dart';
+import '../services/storage_service.dart';
 
-enum AuthStatus { inconnu, nonConnecte, connecte }
+enum AuthStatus {
+  inconnu,
+  nonConnecte,
+  connecte,
+}
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService;
+  final StorageService _storageService;
 
-  AuthProvider({AuthService? authService}) : _authService = authService ?? AuthService();
+  AuthProvider({
+    AuthService? authService,
+    StorageService? storageService,
+  })  : _authService = authService ?? AuthService(),
+        _storageService = storageService ?? StorageService();
 
   AuthStatus status = AuthStatus.inconnu;
   UserModel? currentUser;
+
   bool isLoading = false;
   String? errorMessage;
 
-  bool get estConnecte => status == AuthStatus.connecte && currentUser != null;
+  List<StoredAccount> comptesConnus = [];
+
+  bool get estConnecte =>
+      status == AuthStatus.connecte &&
+      currentUser != null;
+
+  /// Nombre maximum de comptes pouvant être enregistrés
+  /// sur un appareil.
+  static const int maxComptes = 3;
+
+  bool get peutAjouterCompte =>
+      comptesConnus.length < maxComptes;
+
+  /// Charge les comptes déjà connus sur l'appareil.
+  Future<void> chargerComptesConnus() async {
+    comptesConnus =
+        await _storageService.getStoredAccounts();
+
+    notifyListeners();
+  }
 
   /// Appelé par le Splash : vérifie s'il existe une session locale valide.
   Future<void> verifierSessionAuDemarrage() async {
-    final aSession = await _authService.aUneSessionLocale();
+    final aSession =
+        await _authService.aUneSessionLocale();
+
     if (!aSession) {
       status = AuthStatus.nonConnecte;
-      notifyListeners();
+
+      await chargerComptesConnus();
+
       return;
     }
 
     try {
-      currentUser = await _authService.monProfil();
+      currentUser =
+          await _authService.monProfil();
+
       status = AuthStatus.connecte;
+
+      await chargerComptesConnus();
     } on ApiException {
-      // Session invalide/expirée et non rafraîchissable : on repart de zéro.
+      // Session invalide/expirée et non rafraîchissable :
+      // on supprime uniquement la session active.
       await _authService.deconnexion();
+
+      currentUser = null;
       status = AuthStatus.nonConnecte;
+
+      await chargerComptesConnus();
     }
+
     notifyListeners();
   }
 
-  /// Vérifie si l'utilisateur possède déjà un profil (prénom/nom)
+  /// Vérifie si l'utilisateur possède déjà un profil.
   Future<bool> hasProfile() async {
-    // Si nous avons déjà un utilisateur en mémoire, retourner true
     if (currentUser != null) {
       return true;
     }
 
-    // Sinon, essayer de récupérer le profil depuis le service
     try {
-      final user = await _authService.monProfil();
+      final user =
+          await _authService.monProfil();
+
       currentUser = user;
       status = AuthStatus.connecte;
-      notifyListeners();
+
+      await chargerComptesConnus();
+
       return true;
     } on ApiException {
-      // Si une erreur se produit, l'utilisateur n'a pas de profil valide
       return false;
     }
   }
 
-  Future<bool> creerProfil({required String prenom, required String nom, String? avatarId}) async {
+  /// Crée un nouveau profil et l'ajoute aux comptes connus.
+  Future<bool> creerProfil({
+    required String prenom,
+    required String nom,
+    required String email,
+    required String password,
+    String? avatarId,
+  }) async {
+    if (!peutAjouterCompte) {
+      errorMessage =
+          'Vous pouvez enregistrer au maximum 3 comptes sur cet appareil.';
+
+      notifyListeners();
+
+      return false;
+    }
+
     isLoading = true;
     errorMessage = null;
+
     notifyListeners();
 
     try {
-      currentUser = await _authService.creerProfil(
+      currentUser =
+          await _authService.creerProfil(
         prenom: prenom,
         nom: nom,
+        email: email,
+        password: password,
         avatarId: avatarId,
       );
+
       status = AuthStatus.connecte;
+
+      await chargerComptesConnus();
+
       return true;
     } on ApiException catch (e) {
       errorMessage = e.message;
+
       return false;
     } finally {
       isLoading = false;
+
       notifyListeners();
     }
   }
 
-  Future<bool> modifierProfil({String? prenom, String? nom, String? photoUrl, String? avatarId}) async {
+  /// Connecte un compte déjà enregistré sur l'appareil
+  /// avec son mot de passe.
+  Future<bool> connecterCompte({
+    required String userId,
+    required String password,
+  }) async {
     isLoading = true;
     errorMessage = null;
+
     notifyListeners();
 
     try {
-      currentUser = await _authService.modifierProfil(
+      currentUser =
+          await _authService.connecterCompte(
+        userId: userId,
+        password: password,
+      );
+
+      status = AuthStatus.connecte;
+
+      await chargerComptesConnus();
+
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+
+      return false;
+    } finally {
+      isLoading = false;
+
+      notifyListeners();
+    }
+  }
+
+  /// Recherche un compte avec son code EventLink.
+  ///
+  /// Cette opération ne connecte pas l'utilisateur.
+  Future<UserModel?> trouverCompteAvecCode(
+    String accountCode,
+  ) async {
+    isLoading = true;
+    errorMessage = null;
+
+    notifyListeners();
+
+    try {
+      return await _authService.trouverCompteAvecCode(
+        accountCode,
+      );
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+
+      return null;
+    } finally {
+      isLoading = false;
+
+      notifyListeners();
+    }
+  }
+
+  /// Demande l'envoi du code de récupération.
+  Future<bool> demanderCodeRecuperation(
+    String email,
+  ) async {
+    isLoading = true;
+    errorMessage = null;
+
+    notifyListeners();
+
+    try {
+      await _authService.demanderCodeRecuperation(
+        email,
+      );
+
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+
+      return false;
+    } finally {
+      isLoading = false;
+
+      notifyListeners();
+    }
+  }
+
+  /// Vérifie le code de récupération.
+  ///
+  /// Retourne le reset token si le code est valide.
+  Future<String?> verifierCodeRecuperation({
+    required String email,
+    required String code,
+  }) async {
+    isLoading = true;
+    errorMessage = null;
+
+    notifyListeners();
+
+    try {
+      return await _authService.verifierCodeRecuperation(
+        email: email,
+        code: code,
+      );
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+
+      return null;
+    } finally {
+      isLoading = false;
+
+      notifyListeners();
+    }
+  }
+
+  /// Réinitialise le mot de passe.
+  Future<bool> reinitialiserMotDePasse({
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    isLoading = true;
+    errorMessage = null;
+
+    notifyListeners();
+
+    try {
+      currentUser =
+          await _authService.reinitialiserMotDePasse(
+        resetToken: resetToken,
+        newPassword: newPassword,
+      );
+
+      status = AuthStatus.connecte;
+
+      await chargerComptesConnus();
+
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+
+      return false;
+    } finally {
+      isLoading = false;
+
+      notifyListeners();
+    }
+  }
+
+  Future<bool> modifierProfil({
+    String? prenom,
+    String? nom,
+    String? photoUrl,
+    String? avatarId,
+  }) async {
+    isLoading = true;
+    errorMessage = null;
+
+    notifyListeners();
+
+    try {
+      currentUser =
+          await _authService.modifierProfil(
         prenom: prenom,
         nom: nom,
         photoUrl: photoUrl,
         avatarId: avatarId,
       );
+
+      await chargerComptesConnus();
+
       return true;
     } on ApiException catch (e) {
       errorMessage = e.message;
+
       return false;
     } finally {
       isLoading = false;
+
       notifyListeners();
     }
   }
 
+  /// Déconnecte uniquement la session active.
+  ///
+  /// Les autres comptes connus restent enregistrés
+  /// sur l'appareil.
   Future<void> deconnexion() async {
     await _authService.deconnexion();
+
     currentUser = null;
     status = AuthStatus.nonConnecte;
+
+    await chargerComptesConnus();
+
     notifyListeners();
   }
 }
