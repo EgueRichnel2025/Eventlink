@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../routes/app_routes.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -164,6 +165,7 @@ class ProfileScreen extends StatelessWidget {
     required VoidCallback onTap,
     required Color iconColor,
     required Color iconBackground,
+    int? badge,
   }) {
     return Material(
       color: Colors.transparent,
@@ -188,18 +190,55 @@ class ProfileScreen extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: iconBackground,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor,
-                  size: 25,
-                ),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: iconBackground,
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: iconColor,
+                      size: 25,
+                    ),
+                  ),
+                  if (badge != null && badge > 0)
+                    Positioned(
+                      top: -7,
+                      right: -7,
+                      child: Container(
+                        constraints: const BoxConstraints(
+                          minWidth: 21,
+                          minHeight: 21,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.surface,
+                            width: 2,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          badge > 99 ? '99+' : '$badge',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
@@ -242,6 +281,8 @@ class ProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().currentUser;
+    final nombreNotificationsNonLues =
+        context.watch<NotificationProvider>().nombreNonLues;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8FA),
@@ -448,6 +489,7 @@ class ProfileScreen extends StatelessWidget {
                         iconColor: AppColors.primaryDark,
                         iconBackground:
                             AppColors.primarySurface.withValues(alpha: 0.8),
+                        badge: nombreNotificationsNonLues,
                         onTap: () => Navigator.of(context).pushNamed(
                           AppRoutes.notifications,
                         ),

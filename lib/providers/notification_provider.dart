@@ -8,7 +8,8 @@ class NotificationProvider extends ChangeNotifier {
   final NotificationService _notificationService;
 
   NotificationProvider({NotificationService? notificationService})
-      : _notificationService = notificationService ?? NotificationService();
+      : _notificationService =
+            notificationService ?? NotificationService();
 
   List<NotificationModel> notifications = [];
   bool isLoading = false;
@@ -19,6 +20,12 @@ class NotificationProvider extends ChangeNotifier {
   Future<void> initialiser() async {
     // N'échoue jamais, même si Firebase n'est pas configuré.
     await _notificationService.initialiser();
+  }
+
+  /// Enregistre le token FCM une fois que l'utilisateur possède
+  /// une session authentifiée.
+  Future<void> enregistrerTokenApresConnexion() async {
+    await _notificationService.enregistrerTokenApresConnexion();
   }
 
   Future<void> chargerNotifications() async {
@@ -39,20 +46,24 @@ class NotificationProvider extends ChangeNotifier {
   Future<void> marquerCommeLue(String notificationId) async {
     try {
       await _notificationService.marquerCommeLue(notificationId);
+
       notifications = notifications
-          .map((n) => n.id == notificationId
-              ? NotificationModel(
-                  id: n.id,
-                  userId: n.userId,
-                  type: n.type,
-                  titre: n.titre,
-                  corps: n.corps,
-                  data: n.data,
-                  lu: true,
-                  createdAt: n.createdAt,
-                )
-              : n)
+          .map(
+            (n) => n.id == notificationId
+                ? NotificationModel(
+                    id: n.id,
+                    userId: n.userId,
+                    type: n.type,
+                    titre: n.titre,
+                    corps: n.corps,
+                    data: n.data,
+                    lu: true,
+                    createdAt: n.createdAt,
+                  )
+                : n,
+          )
           .toList();
+
       notifyListeners();
     } on ApiException {
       // Une notification qui reste "non lue" faute de réseau n'est pas bloquant.

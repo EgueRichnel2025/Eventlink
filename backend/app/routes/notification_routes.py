@@ -1,3 +1,5 @@
+from datetime import timezone
+
 from pydantic import BaseModel
 from bson import ObjectId
 from fastapi import APIRouter, Depends
@@ -33,6 +35,20 @@ async def mes_notifications(
     for n in notifs:
         n["_id"] = str(n["_id"])
         n["user_id"] = str(n["user_id"])
+
+        # MongoDB peut restituer les datetime UTC sans tzinfo.
+        # On indique explicitement que ces dates sont en UTC
+        # afin que Flutter puisse ensuite appliquer .toLocal().
+        if n.get("created_at") is not None:
+            created_at = n["created_at"]
+
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(
+                    tzinfo=timezone.utc,
+                )
+
+            n["created_at"] = created_at.isoformat()
+
     return notifs
 
 

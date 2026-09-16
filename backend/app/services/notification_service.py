@@ -100,3 +100,54 @@ async def _envoyer_push(db: AsyncIOMotorDatabase, user_id: ObjectId, titre: str,
         messaging.send(message)
     except Exception as exc:  # noqa: BLE001 - un échec d'envoi ne doit jamais casser la requête
         logger.warning("Échec d'envoi FCM pour %s: %s", user_id, exc)
+
+async def notifier_suppression_evenement(
+    db: AsyncIOMotorDatabase,
+    auteur_id: ObjectId,
+    event_id: ObjectId,
+    group_id: ObjectId,
+    supprimeur_nom: str,
+    supprimeur_role: str,
+    raison: str,
+) -> None:
+    role_label = (
+        "propriétaire du groupe"
+        if supprimeur_role == "owner"
+        else "administrateur du groupe"
+    )
+
+    titre = "Votre événement a été supprimé"
+    corps = (
+        f"{supprimeur_nom}, {role_label}, "
+        f"a supprimé votre événement. "
+        f"Raison : {raison}"
+    )
+
+    data = {
+        "event_id": str(event_id),
+        "group_id": str(group_id),
+        "deleted_by_name": supprimeur_nom,
+        "deleted_by_role": supprimeur_role,
+        "reason": raison,
+    }
+
+    await db.notifications.insert_one(
+        {
+            "user_id": auteur_id,
+            "type": "event_deleted",
+            "titre": titre,
+            "corps": corps,
+            "data": data,
+            "lu": False,
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
+
+    if _firebase_available:
+        await _envoyer_push(
+            db,
+            auteur_id,
+            titre,
+            corps,
+            data,
+        )
