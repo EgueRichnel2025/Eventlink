@@ -1126,8 +1126,7 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
                                           return 'Le mot de passe est obligatoire';
                                         }
 
-                                        if (password.length <
-                                            8) {
+                                        if (password.length < 8) {
                                           return 'Le mot de passe doit contenir au moins 8 caractères';
                                         }
 
@@ -1273,6 +1272,40 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
                     ),
                   );
                 },
+              ),
+            ),
+
+            // Bouton retour vers « Choisir un compte »
+            //
+            // IMPORTANT :
+            // Il est volontairement placé EN DERNIER dans le Stack.
+            // Il se trouve ainsi au-dessus du SingleChildScrollView
+            // et reçoit correctement les clics.
+            Positioned(
+              top: 0,
+              left: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    left: 8,
+                    top: 4,
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: IconButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              Navigator.of(context).pop();
+                            },
+                      icon: const Icon(
+                        Icons.arrow_back_rounded,
+                      ),
+                      color: Colors.white,
+                      tooltip: 'Retour',
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
