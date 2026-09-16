@@ -7,6 +7,17 @@ class AppRoutes {
 
   static const profilSetup = '/profil-setup';
 
+  static const accountSelection = '/account-selection';
+
+  static const passwordRecoveryEmail =
+      '/password-recovery/email';
+
+  static const passwordRecoveryCode =
+      '/password-recovery/code';
+
+  static const passwordRecoveryNewPassword =
+      '/password-recovery/new-password';
+
   static const groupeChoice = '/groupe-choice';
 
   static const groupesScreen = '/groupes';

@@ -107,11 +107,13 @@ class ApiService {
 
   Future<dynamic> delete(
     String path, {
+    Map<String, dynamic>? query,
     bool auth = true,
   }) {
     return _request(
       'DELETE',
       path,
+      query: query,
       auth: auth,
     );
   }

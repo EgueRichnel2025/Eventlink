@@ -5,17 +5,10 @@ import '../../config/app_config.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/group_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../routes/app_routes.dart';
 import '../../services/storage_service.dart';
 
-/// Splash screen EventLink.
-///
-/// Ne se contente pas d'un "Loading..." : logo animé, identité orange/blanc,
-/// puis décision de redirection selon l'état réel de la session :
-///  - première utilisation -> Onboarding
-///  - pas de session / pas de profil -> ProfilSetup
-///  - profil OK, 0 groupe -> GroupeChoice
-///  - profil OK, >=1 groupe -> GroupesScreen
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -66,6 +59,7 @@ class _SplashScreenState extends State<SplashScreen>
     final storage = context.read<StorageService>();
     final auth = context.read<AuthProvider>();
     final groupes = context.read<GroupProvider>();
+    final notifications = context.read<NotificationProvider>();
 
     await Future.wait([
       Future.delayed(const Duration(milliseconds: 1400)),
@@ -91,12 +85,25 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    if (!auth.estConnecte) {
-      Navigator.of(context).pushReplacementNamed(
-        AppRoutes.profilSetup,
-      );
-      return;
-    }
+if (!auth.estConnecte) {
+  if (auth.comptesConnus.isNotEmpty) {
+    Navigator.of(context).pushReplacementNamed(
+      AppRoutes.accountSelection,
+    );
+  } else {
+    Navigator.of(context).pushReplacementNamed(
+      AppRoutes.profilSetup,
+    );
+  }
+
+  return;
+}
+
+    // À ce stade, le JWT est disponible :
+    // on peut maintenant enregistrer correctement le token FCM.
+    await notifications.enregistrerTokenApresConnexion();
+
+    if (!mounted) return;
 
     await groupes.chargerMesGroupes();
 

@@ -14,7 +14,11 @@ import '../screens/groups/groupes_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/splash/splash_screen.dart';
+import '../screens/auth/account_selection_screen.dart';
 import '../screens/auth/profil_setup_screen.dart';
+import '../screens/auth/password_recovery/password_recovery_code_screen.dart';
+import '../screens/auth/password_recovery/password_recovery_email_screen.dart';
+import '../screens/auth/password_recovery/password_recovery_new_password_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import 'app_routes.dart';
 
@@ -42,6 +46,36 @@ class AppRouter {
       case AppRoutes.profilSetup:
         return _page(
           const ProfilSetupScreen(),
+        );
+
+      case AppRoutes.accountSelection:
+        return _page(
+          const AccountSelectionScreen(),
+        );
+
+      case AppRoutes.passwordRecoveryEmail:
+        return _page(
+          const PasswordRecoveryEmailScreen(),
+        );
+
+      case AppRoutes.passwordRecoveryCode:
+        final email =
+            settings.arguments as String;
+
+        return _page(
+          PasswordRecoveryCodeScreen(
+            email: email,
+          ),
+        );
+
+      case AppRoutes.passwordRecoveryNewPassword:
+        final resetToken =
+            settings.arguments as String;
+
+        return _page(
+          PasswordRecoveryNewPasswordScreen(
+            resetToken: resetToken,
+          ),
         );
 
       case AppRoutes.groupeChoice:
