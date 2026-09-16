@@ -200,6 +200,99 @@ async def ajouter_commentaire(
     )
 
 
+async def modifier_commentaire(
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+    comment_id: ObjectId,
+    user_id: ObjectId,
+    texte: str,
+) -> dict:
+    commentaire = await db.comments.find_one(
+        {
+            "_id": comment_id,
+            "event_id": event_id,
+        }
+    )
+
+    if commentaire is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Commentaire introuvable",
+        )
+
+    if commentaire["user_id"] != user_id:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Seul l'auteur peut modifier ce commentaire",
+        )
+
+    texte = texte.strip()
+
+    if not texte:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Le commentaire ne peut pas être vide",
+        )
+
+    await db.comments.update_one(
+        {
+            "_id": comment_id,
+            "event_id": event_id,
+        },
+        {
+            "$set": {
+                "texte": texte,
+            }
+        },
+    )
+
+    updated_comment = await db.comments.find_one(
+        {
+            "_id": comment_id,
+            "event_id": event_id,
+        }
+    )
+
+    return await _to_public_comment(
+        db,
+        updated_comment,
+        user_id,
+    )
+
+
+async def supprimer_commentaire(
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+    comment_id: ObjectId,
+) -> None:
+    commentaire = await db.comments.find_one(
+        {
+            "_id": comment_id,
+            "event_id": event_id,
+        }
+    )
+
+    if commentaire is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Commentaire introuvable",
+        )
+
+    await db.comments.delete_one(
+        {
+            "_id": comment_id,
+            "event_id": event_id,
+        }
+    )
+
+    await db.comment_reactions.delete_many(
+        {
+            "comment_id": comment_id,
+            "event_id": event_id,
+        }
+    )
+
+
 async def lister_commentaires(
     db: AsyncIOMotorDatabase,
     event_id: ObjectId,

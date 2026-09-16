@@ -373,9 +373,25 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                             fontSize: 15,
                           ),
                           cursorColor: AppColors.primary,
-                          decoration: const InputDecoration(
+                          decoration:  InputDecoration(
                             labelText: 'Lien de l\'événement',
                             hintText: 'https://example.com/evenement',
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12)
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: AppColors.primary.withValues(alpha: 0.25),
+                              ),
+                            ), 
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: AppColors.primary,
+                                width: 2,
+                              ),
+                            )
                           ),
                           validator: _validerLien,
                         ),
@@ -400,11 +416,27 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
                             fontSize: 15,
                           ),
                           cursorColor: AppColors.primary,
-                          decoration: const InputDecoration(
+                          decoration:  InputDecoration(
                             labelText: 'Description',
                             hintText:
                                 'Décrivez l\'événement en détail (minimum 10 mots)',
                             counterText: '',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: AppColors.primary.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                color: AppColors.primary,
+                                width: 2,
+                              ),
+                            ),
                           ),
                           validator: _validerDescription,
                           onChanged: (_) {

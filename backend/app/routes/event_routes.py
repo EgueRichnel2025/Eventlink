@@ -320,6 +320,7 @@ async def modifier_event(
 )
 async def supprimer_event(
     event_id: str,
+    raison: str | None = None,
     user_id: str = Depends(get_current_user_id),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
@@ -347,11 +348,68 @@ async def supprimer_event(
         and membership["role"] in ("owner", "admin")
     )
 
-    if not (est_auteur or est_admin):
+    # L'auteur peut supprimer son propre événement sans raison.
+    if est_auteur:
+        await event_service.supprimer_event(
+            db,
+            ObjectId(event_id),
+        )
+
+        return {"success": True}
+
+    # Un administrateur ou le propriétaire peut supprimer
+    # l'événement d'un autre membre, mais une raison est obligatoire.
+    if not est_admin:
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
             "Action non autorisée",
         )
+
+    raison = raison.strip() if raison else ""
+
+    if not raison:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Une raison est obligatoire pour supprimer l'événement d'un autre membre",
+        )
+
+    if len(raison) > 500:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "La raison ne peut pas dépasser 500 caractères",
+        )
+
+    supprimeur = await db.users.find_one(
+        {"_id": ObjectId(user_id)}
+    )
+
+    if supprimeur is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Utilisateur introuvable",
+        )
+
+    supprimeur_nom = (
+        f"{supprimeur.get('prenom', '')} "
+        f"{supprimeur.get('nom', '')}"
+    ).strip()
+
+    if not supprimeur_nom:
+        supprimeur_nom = "Un administrateur"
+
+    role = membership["role"]
+
+    # La notification est enregistrée avant la suppression
+    # afin que l'auteur conserve l'information même sans Firebase.
+    await notification_service.notifier_suppression_evenement(
+        db=db,
+        auteur_id=event["auteur_id"],
+        event_id=ObjectId(event_id),
+        group_id=event["group_id"],
+        supprimeur_nom=supprimeur_nom,
+        supprimeur_role=role,
+        raison=raison,
+    )
 
     await event_service.supprimer_event(
         db,
@@ -633,6 +691,134 @@ async def ajouter_commentaire(
     )
 
     return CommentairePublic.model_validate(commentaire)
+
+
+@router.put(
+    "/events/{event_id}/commentaires/{comment_id}",
+    response_model=CommentairePublic,
+)
+async def modifier_commentaire(
+    event_id: str,
+    comment_id: str,
+    payload: CommentaireRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    event = await db.events.find_one(
+        {"_id": ObjectId(event_id)}
+    )
+
+    if event is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
+    membership = await db.group_members.find_one(
+        {
+            "group_id": event["group_id"],
+            "user_id": user["_id"],
+        }
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
+
+    commentaire = await db.comments.find_one(
+        {
+            "_id": ObjectId(comment_id),
+            "event_id": ObjectId(event_id),
+        }
+    )
+
+    if commentaire is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Commentaire introuvable",
+        )
+
+    if commentaire["user_id"] != user["_id"]:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Seul l'auteur peut modifier ce commentaire",
+        )
+
+    commentaire = await event_service.modifier_commentaire(
+        db,
+        ObjectId(event_id),
+        ObjectId(comment_id),
+        user["_id"],
+        payload.texte,
+    )
+
+    return CommentairePublic.model_validate(commentaire)
+
+
+@router.delete(
+    "/events/{event_id}/commentaires/{comment_id}",
+    response_model=dict,
+)
+async def supprimer_commentaire(
+    event_id: str,
+    comment_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    event = await db.events.find_one(
+        {"_id": ObjectId(event_id)}
+    )
+
+    if event is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
+    membership = await db.group_members.find_one(
+        {
+            "group_id": event["group_id"],
+            "user_id": user["_id"],
+        }
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
+
+    commentaire = await db.comments.find_one(
+        {
+            "_id": ObjectId(comment_id),
+            "event_id": ObjectId(event_id),
+        }
+    )
+
+    if commentaire is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Commentaire introuvable",
+        )
+
+    est_auteur = commentaire["user_id"] == user["_id"]
+    est_admin = membership["role"] in ("admin", "owner")
+
+    if not (est_auteur or est_admin):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Action non autorisée",
+        )
+
+    await event_service.supprimer_commentaire(
+        db,
+        ObjectId(event_id),
+        ObjectId(comment_id),
+    )
+
+    return {"success": True}
 
 
 @router.post(

@@ -128,9 +128,17 @@ class EventProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> supprimerEvent(String eventId) async {
+  Future<bool> supprimerEvent(
+    String eventId, {
+    String? raison,
+  }) async {
+    errorMessage = null;
+
     try {
-      await _eventService.supprimerEvent(eventId);
+      await _eventService.supprimerEvent(
+        eventId,
+        raison: raison,
+      );
 
       events = events
           .where((e) => e.id != eventId)

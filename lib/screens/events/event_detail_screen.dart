@@ -6,7 +6,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../models/comment_model.dart';
 import '../../models/event_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
+import '../../providers/group_provider.dart';
 import '../../widgets/error_retry_view.dart';
 
 class EventDetailScreen extends StatefulWidget {
@@ -31,6 +33,7 @@ class _EventDetailScreenState
   bool _chargementEvent = true;
   String? _erreur;
   bool _envoiCommentaire = false;
+  bool _suppressionEnCours = false;
 
   static const List<String> _reactionsDisponibles = [
     '👍',
@@ -925,6 +928,230 @@ class _EventDetailScreenState
     );
   }
 
+  Future<String?> _demanderRaisonSuppression(
+    EventModel event,
+  ) async {
+    final controller = TextEditingController();
+
+    final raison = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final raisonValide =
+                controller.text.trim().isNotEmpty;
+
+            return AlertDialog(
+              backgroundColor: AppColors.surface,
+              surfaceTintColor: Colors.transparent,
+              title: const Text(
+                'Supprimer l’événement ?',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Cet événement appartient à '
+                      '${event.auteur.nomComplet}.',
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Une raison est obligatoire. '
+                      'Elle sera communiquée à l’auteur.',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: controller,
+                      maxLength: 500,
+                      maxLines: 4,
+                      minLines: 2,
+                      textCapitalization:
+                          TextCapitalization.sentences,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText:
+                            'Raison de la suppression',
+                        hintText:
+                            'Expliquez pourquoi cet événement est supprimé...',
+                        labelStyle: TextStyle(
+                          color: AppColors.textSecondary,
+                        ),
+                        hintStyle: TextStyle(
+                          color: AppColors.textSecondary,
+                        ),
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (_) {
+                        setDialogState(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () =>
+                      Navigator.of(dialogContext).pop(),
+                  child: const Text('Annuler'),
+                ),
+                FilledButton.icon(
+                  onPressed: raisonValide
+                      ? () {
+                          Navigator.of(dialogContext).pop(
+                            controller.text.trim(),
+                          );
+                        }
+                      : null,
+                  icon: const Icon(
+                    Icons.delete_outline,
+                  ),
+                  label: const Text('Supprimer'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    return raison;
+  }
+
+  Future<void> _supprimerEvenement(
+    EventModel event,
+  ) async {
+    if (_suppressionEnCours) {
+      return;
+    }
+
+    final authProvider =
+        context.read<AuthProvider>();
+    final groupProvider =
+        context.read<GroupProvider>();
+
+    final userId =
+        authProvider.currentUser?.id;
+
+    final estAuteur =
+        userId != null &&
+        event.auteur.userId == userId;
+
+    final groupe =
+        groupProvider.groupeCourant;
+
+    final estAdminOuProprietaire =
+        groupe?.estAdmin ?? false;
+
+    if (!estAuteur && !estAdminOuProprietaire) {
+      return;
+    }
+
+    String? raison;
+
+    if (estAuteur) {
+      final confirmer = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            surfaceTintColor: Colors.transparent,
+            title: const Text(
+              'Supprimer l’événement ?',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            content: const Text(
+              'Cette action est irréversible.',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(false),
+                child: const Text('Annuler'),
+              ),
+              FilledButton.icon(
+                onPressed: () =>
+                    Navigator.of(dialogContext).pop(true),
+                icon: const Icon(
+                  Icons.delete_outline,
+                ),
+                label: const Text('Supprimer'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (confirmer != true || !mounted) {
+        return;
+      }
+    } else {
+      raison = await _demanderRaisonSuppression(event);
+
+      if (raison == null ||
+          raison.trim().isEmpty ||
+          !mounted) {
+        return;
+      }
+    }
+
+    setState(() {
+      _suppressionEnCours = true;
+    });
+
+    final provider =
+        context.read<EventProvider>();
+
+    final success =
+        await provider.supprimerEvent(
+      event.id,
+      raison: raison,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _suppressionEnCours = false;
+    });
+
+    if (success) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    final message =
+        provider.errorMessage ??
+        'Impossible de supprimer cet événement.';
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_chargementEvent &&
@@ -1088,6 +1315,59 @@ class _EventDetailScreenState
             ),
           ],
         ),
+        actions: (() {
+          final authProvider =
+              context.read<AuthProvider>();
+          final groupProvider =
+              context.read<GroupProvider>();
+
+          final userId =
+              authProvider.currentUser?.id;
+
+          final estAuteur =
+              userId != null &&
+              event.auteur.userId == userId;
+
+          final estAdminOuProprietaire =
+              groupProvider.groupeCourant?.estAdmin ??
+                  false;
+
+          final peutSupprimer =
+              estAuteur ||
+              estAdminOuProprietaire;
+
+          if (!peutSupprimer) {
+            return <Widget>[];
+          }
+
+          return [
+            PopupMenuButton<String>(
+              tooltip: 'Actions',
+              enabled: !_suppressionEnCours,
+              onSelected: (value) {
+                if (value == 'supprimer') {
+                  _supprimerEvenement(event);
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem<String>(
+                  value: 'supprimer',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.delete_outline,
+                        color:
+                            AppColors.primaryDark,
+                      ),
+                       SizedBox(width: 12),
+                       Text('Supprimer'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ];
+        })(),
       ),
       body: Consumer<EventProvider>(
         builder: (

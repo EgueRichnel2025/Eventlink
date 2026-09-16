@@ -79,8 +79,17 @@ class EventService {
     );
   }
 
-  Future<void> supprimerEvent(String eventId) async {
-    await _api.delete('/events/$eventId');
+  Future<void> supprimerEvent(
+    String eventId, {
+    String? raison,
+  }) async {
+    await _api.delete(
+      '/events/$eventId',
+      query: {
+        if (raison != null && raison.trim().isNotEmpty)
+          'raison': raison.trim(),
+      },
+    );
   }
 
   Future<void> changerStatut(
