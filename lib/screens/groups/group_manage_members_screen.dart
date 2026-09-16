@@ -328,8 +328,17 @@ class _GroupManageMembersScreenState
                         final membre =
                             membres[index];
 
+                        final groupe =
+                            provider.groupeCourant;
+
                         final peutRetirer =
-                            membre.role != 'owner';
+                            groupe != null &&
+                            (
+                              (groupe.estProprietaire &&
+                                  membre.role != 'owner') ||
+                              (groupe.monRole == 'admin' &&
+                                  membre.role == 'member')
+                            );
 
                         return Card(
                           margin: EdgeInsets.zero,

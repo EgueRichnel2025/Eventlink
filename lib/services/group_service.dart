@@ -54,7 +54,7 @@ class GroupService {
     await _api.delete('/groupes/$groupId/membres/$userId');
   }
 
-  Future<void> transfererPropriete(String groupId, String currentOwnerId, String newOwnerId) async {
+  Future<void> transfererPropriete(String groupId, String newOwnerId) async {
     await _api.post(
       '/groupes/$groupId/transfer-ownership',
       body: {
@@ -63,7 +63,7 @@ class GroupService {
     );
   }
 
-  Future<void> promouvoirAdmin(String groupId, String userIdToPromote, String currentOwnerId) async {
+  Future<void> promouvoirAdmin(String groupId, String userIdToPromote) async {
     await _api.post(
       '/groupes/$groupId/promote-admin',
       body: {
@@ -72,7 +72,7 @@ class GroupService {
     );
   }
 
-  Future<void> retrocederAdmin(String groupId, String userIdToDemote, String currentOwnerId) async {
+  Future<void> retrocederAdmin(String groupId, String userIdToDemote) async {
     await _api.post(
       '/groupes/$groupId/demote-admin',
       body: {

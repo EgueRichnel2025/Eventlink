@@ -465,13 +465,14 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
           const SizedBox(
             height: AppSpacing.lg,
           ),
-          Container(
-            padding: const EdgeInsets.all(
-              AppSpacing.md,
-            ),
-            decoration: BoxDecoration(
-              color:
-                  AppColors.primarySurface,
+          if (groupe.estAdmin == true)
+            Container(
+              padding: const EdgeInsets.all(
+                AppSpacing.md,
+              ),
+              decoration: BoxDecoration(
+                color:
+                    AppColors.primarySurface,
               borderRadius:
                   BorderRadius.circular(15),
             ),
@@ -730,9 +731,10 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
               );
             },
           ),
-        _buildGestionCard(
-          icon: Icons.people_alt_outlined,
-          title: 'Gérer les membres',
+        if (estAdmin)
+          _buildGestionCard(
+            icon: Icons.people_alt_outlined,
+            title: 'Gérer les membres',
           subtitle:
               'Rechercher, consulter et gérer les membres du groupe',
           onTap: () {
@@ -743,7 +745,7 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
             );
           },
         ),
-        if (estAdmin)
+        if (groupe.estProprietaire)
           _buildGestionCard(
             icon:
                 Icons.admin_panel_settings_outlined,
@@ -1123,12 +1125,15 @@ class _GroupMembersScreenState extends State<GroupMembersScreen> {
                                   ],
                                 ),
                               ),
-                              if (groupe
-                                          .estAdmin ==
-                                      true &&
-                                  !estMoi &&
-                                  membre.role ==
-                                      'member')
+                                if (
+                                  estMoi == false &&
+                                  (
+                                    (groupe.estProprietaire &&
+                                     membre.role != 'owner') ||
+                                     (groupe.monRole == 'admin' &&
+                                     membre.role == 'member')
+                                  )
+                                )
                                 TextButton.icon(
                                   onPressed: () =>
                                       _retirer(

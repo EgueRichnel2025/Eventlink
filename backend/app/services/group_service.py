@@ -128,8 +128,65 @@ async def modifier_groupe(db: AsyncIOMotorDatabase, group_id: ObjectId, updates:
         await db.groups.update_one({"_id": group_id}, {"$set": updates})
 
 
-async def retirer_membre(db: AsyncIOMotorDatabase, group_id: ObjectId, target_user_id: ObjectId) -> None:
-    await db.group_members.delete_one({"group_id": group_id, "user_id": target_user_id})
+async def retirer_membre(
+    db: AsyncIOMotorDatabase,
+    group_id: ObjectId,
+    target_user_id: ObjectId,
+    actor_user_id: ObjectId,
+) -> None:
+    actor_membership = await db.group_members.find_one(
+        {
+            "group_id": group_id,
+            "user_id": actor_user_id,
+        }
+    )
+
+    if actor_membership is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
+
+    target_membership = await db.group_members.find_one(
+        {
+            "group_id": group_id,
+            "user_id": target_user_id,
+        }
+    )
+
+    if target_membership is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Utilisateur introuvable dans ce groupe",
+        )
+
+    if target_membership["role"] == "owner":
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Le propriétaire du groupe ne peut pas être retiré",
+        )
+
+    if (
+        actor_membership["role"] == "admin"
+        and target_membership["role"] != "member"
+    ):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Un administrateur peut uniquement retirer un membre",
+        )
+
+    if actor_membership["role"] not in ("admin", "owner"):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Seuls les administrateurs ou le propriétaire peuvent retirer un membre",
+        )
+
+    await db.group_members.delete_one(
+        {
+            "group_id": group_id,
+            "user_id": target_user_id,
+        }
+    )
 
 
 async def transferer_propriete(db: AsyncIOMotorDatabase, group_id: ObjectId, owner_id: ObjectId, new_owner_id: ObjectId) -> None:

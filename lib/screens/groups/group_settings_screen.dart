@@ -155,12 +155,12 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
     try {
       await groupService.transfererPropriete(
         groupeActuel.id,
-        groupeActuel.ownerId,
         nouveauProprioId,
       );
 
       final groupeMisAJour = groupeActuel.copyWith(
         ownerId: nouveauProprioId,
+        monRole: 'admin',
       );
 
       groupProvider.mettreAJourGroupeDansListe(
@@ -214,7 +214,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       await groupService.promouvoirAdmin(
         groupeActuel.id,
         userId,
-        groupeActuel.ownerId,
       );
 
       await groupProvider.chargerMembresDuGroupeCourant();
@@ -259,7 +258,6 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       await groupService.retrocederAdmin(
         groupeActuel.id,
         userId,
-        groupeActuel.ownerId,
       );
 
       await groupProvider.chargerMembresDuGroupeCourant();
@@ -553,7 +551,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
             ),
           ],
 
-          if (estAdmin) ...[
+          if (estProprietaire) ...[
             const SizedBox(
               height: AppSpacing.xl,
             ),

@@ -88,7 +88,7 @@ async def membres_groupe(
 @router.get("/{group_id}/code-invitation", response_model=dict)
 async def obtenir_code_invitation(
     group_id: str,
-    _membership: dict = Depends(require_group_owner),
+    _membership: dict = Depends(require_group_admin),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
     """Obtenir le code d'invitation actuel du groupe (propriétaire uniquement)."""
@@ -106,7 +106,7 @@ async def obtenir_code_invitation(
 @router.post("/{group_id}/regenerer-code", response_model=dict)
 async def regenerer_code_invitation(
     group_id: str,
-    _membership: dict = Depends(require_group_owner),
+    _membership: dict = Depends(require_group_admin),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
     """Régénérer le code d'invitation du groupe (propriétaire uniquement)."""
@@ -159,6 +159,7 @@ async def retirer_membre(
         db,
         ObjectId(group_id),
         ObjectId(target_user_id),
+        ObjectId(_membership["user_id"]),
     )
     return {"success": True}
 
@@ -182,7 +183,7 @@ async def transferer_propriete(
     groupe = await group_service.obtenir_groupe(
         db,
         ObjectId(group_id),
-        ObjectId(new_owner_id),
+        ObjectId(_membership["user_id"]),
     )
 
     return GroupePublic.model_validate(groupe).model_dump()
@@ -192,11 +193,11 @@ async def transferer_propriete(
 async def promover_admin(
     group_id: str,
     admin_id: str = Body(..., embed=True),
-    _membership: dict = Depends(require_group_admin),
+    _membership: dict = Depends(require_group_owner),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
     """Promouvoir un membre en administrateur."""
-    await group_service.promouvoir_admin(
+    await group_service.promover_admin(
         db,
         ObjectId(group_id),
         ObjectId(admin_id),

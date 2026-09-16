@@ -50,7 +50,6 @@ class _GroupAdministratorsScreenState
       await GroupService().promouvoirAdmin(
         groupe.id,
         userId,
-        groupe.ownerId,
       );
 
       await provider.chargerMembresDuGroupeCourant();
@@ -103,7 +102,6 @@ class _GroupAdministratorsScreenState
       await GroupService().retrocederAdmin(
         groupe.id,
         userId,
-        groupe.ownerId,
       );
 
       await provider.chargerMembresDuGroupeCourant();
