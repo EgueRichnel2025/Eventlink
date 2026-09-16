@@ -7,7 +7,7 @@ import 'package:eventlink/models/user_model.dart';
 void main() {
   group('UserModel', () {
     test('fromJson/toJson round-trip', () {
-      final json = {'_id': 'u1', 'prenom': 'Richnel', 'nom': 'EGUE', 'photo_url': null};
+      final json = {'_id': 'u1', 'prenom': 'Richnel', 'nom': 'EGUE', 'photo_url': null, 'avatar_id': null, 'account_code': 'EL-TEST01', 'email': null};
       final user = UserModel.fromJson(json);
 
       expect(user.id, 'u1');
