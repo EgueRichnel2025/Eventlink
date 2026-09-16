@@ -26,3 +26,13 @@ backend/firebase-credentials.json
 # Event uploads (runtime files)
 backend/uploads/
 backend/openapi.json
+backend/firebase/
+
+# Generated Android tooling
+android/.kotlin/
+
+# Local backend test/debug scripts
+backend/check_users.py
+backend/find_event.py
+backend/test_fcm.py
+backend/test_user_b.py

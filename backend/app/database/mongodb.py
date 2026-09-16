@@ -58,6 +58,11 @@ async def _ensure_indexes(
 ) -> None:
     """Crée les index nécessaires à la cohérence et aux performances."""
 
+    await db.users.create_index(
+        "account_code",
+        unique=True,
+    )
+
     await db.groups.create_index(
         "code_invitation",
         unique=True,
