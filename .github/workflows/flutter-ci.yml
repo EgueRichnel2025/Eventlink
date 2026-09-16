@@ -17,6 +17,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Verify Firebase configuration
+        run: |
+          echo "Repository files:"
+          ls -la
+          echo "lib directory:"
+          ls -la lib
+          echo "Firebase options:"
+          test -f lib/firebase_options.dart
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
