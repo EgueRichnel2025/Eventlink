@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -34,6 +35,8 @@ class _EventDetailScreenState
   String? _erreur;
   bool _envoiCommentaire = false;
   bool _suppressionEnCours = false;
+
+  CommentModel? _commentaireEnReponse;
 
   static const List<String> _reactionsDisponibles = [
     '👍',
@@ -135,6 +138,8 @@ class _EventDetailScreenState
         await events.ajouterCommentaire(
       widget.eventId,
       texte,
+      parentCommentId:
+          _commentaireEnReponse?.id,
     );
 
     if (!mounted) return;
@@ -145,6 +150,10 @@ class _EventDetailScreenState
 
     if (succes) {
       _commentaireController.clear();
+
+      setState(() {
+        _commentaireEnReponse = null;
+      });
     } else if (events.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -194,6 +203,370 @@ class _EventDetailScreenState
           fontSize: 22,
         ),
       ),
+    );
+  }
+
+  Future<void> _repondreAuCommentaire(
+    CommentModel commentaire,
+  ) async {
+    setState(() {
+      _commentaireEnReponse = commentaire;
+    });
+  }
+
+  Future<void> _copierCommentaire(
+    CommentModel commentaire,
+  ) async {
+    await Clipboard.setData(
+      ClipboardData(
+        text: commentaire.texte,
+      ),
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Commentaire copié.',
+        ),
+      ),
+    );
+  }
+
+  Future<void> _epinglerCommentaire(
+    CommentModel commentaire,
+  ) async {
+    final provider =
+        context.read<EventProvider>();
+
+    final succes =
+        await provider.toggleCommentEpingle(
+      eventId: widget.eventId,
+      commentId: commentaire.id,
+    );
+
+    if (!mounted) return;
+
+    if (!succes &&
+        provider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            provider.errorMessage!,
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _modifierCommentaire(
+    CommentModel commentaire,
+  ) async {
+    final controller = TextEditingController(
+      text: commentaire.texte,
+    );
+
+    final texte = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          title: const Text(
+            'Modifier le commentaire',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          content: TextField(
+            controller: controller,
+            maxLength: 500,
+            maxLines: 5,
+            minLines: 2,
+            autofocus: true,
+            textCapitalization:
+                TextCapitalization.sentences,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+            ),
+            decoration: const InputDecoration(
+              hintText: 'Votre commentaire...',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value =
+                    controller.text.trim();
+
+                if (value.isEmpty) return;
+
+                Navigator.of(dialogContext)
+                    .pop(value);
+              },
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (!mounted || texte == null) {
+      return;
+    }
+
+    final provider =
+        context.read<EventProvider>();
+
+    final succes =
+        await provider.modifierCommentaire(
+      eventId: widget.eventId,
+      commentId: commentaire.id,
+      texte: texte,
+    );
+
+    if (!mounted) return;
+
+    if (!succes &&
+        provider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            provider.errorMessage!,
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _supprimerCommentaire(
+    CommentModel commentaire,
+  ) async {
+    final confirmer = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.surface,
+          surfaceTintColor: Colors.transparent,
+          title: const Text(
+            'Supprimer le commentaire ?',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          content: const Text(
+            'Cette action est définitive.',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton.icon(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(true),
+              icon: const Icon(
+                Icons.delete_outline,
+              ),
+              label: const Text('Supprimer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmer != true || !mounted) {
+      return;
+    }
+
+    final provider =
+        context.read<EventProvider>();
+
+    final succes =
+        await provider.supprimerCommentaire(
+      eventId: widget.eventId,
+      commentId: commentaire.id,
+    );
+
+    if (!mounted) return;
+
+    if (!succes &&
+        provider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            provider.errorMessage!,
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _afficherActionsCommentaire(
+    CommentModel commentaire,
+  ) async {
+    final authProvider =
+        context.read<AuthProvider>();
+
+    final groupProvider =
+        context.read<GroupProvider>();
+
+    final userId =
+        authProvider.currentUser?.id;
+
+    final estAuteur =
+        userId != null &&
+        commentaire.userId == userId;
+
+    final estAdmin =
+        groupProvider.groupeCourant?.estAdmin ??
+            false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Text(
+                  '📋',
+                  style: TextStyle(fontSize: 22),
+                ),
+                title: const Text(
+                  'Copier',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  await _copierCommentaire(
+                    commentaire,
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Text(
+                  '↩️',
+                  style: TextStyle(fontSize: 22),
+                ),
+                title: const Text(
+                  'Répondre',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  await _repondreAuCommentaire(
+                    commentaire,
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.add_reaction_outlined,
+                  color: AppColors.primary,
+                ),
+                title: const Text(
+                  'Réagir',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  await _afficherPaletteReactions(
+                    commentaire,
+                  );
+                },
+              ),
+              if (estAdmin)
+                ListTile(
+                  leading: const Text(
+                    '📌',
+                    style: TextStyle(fontSize: 22),
+                  ),
+                  title: Text(
+                    commentaire.epingle
+                        ? 'Désépingler'
+                        : 'Épingler',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _epinglerCommentaire(
+                      commentaire,
+                    );
+                  },
+                ),
+              if (estAuteur)
+                ListTile(
+                  leading: const Icon(
+                    Icons.edit_outlined,
+                    color: AppColors.primary,
+                  ),
+                  title: const Text(
+                    'Modifier',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _modifierCommentaire(
+                      commentaire,
+                    );
+                  },
+                ),
+              if (estAuteur || estAdmin)
+                ListTile(
+                  leading: const Icon(
+                    Icons.delete_outline,
+                    color: AppColors.primary,
+                  ),
+                  title: const Text(
+                    'Supprimer',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await _supprimerCommentaire(
+                      commentaire,
+                    );
+                  },
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -820,15 +1193,37 @@ class _EventDetailScreenState
       commentaire.createdAt.toLocal(),
     );
 
+    final commentaires =
+        context.read<EventProvider>().commentaires;
+
+    CommentModel? parent;
+
+    for (final element in commentaires) {
+      if (element.id == commentaire.parentCommentId) {
+        parent = element;
+        break;
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.only(
         bottom: AppSpacing.md,
       ),
       child: GestureDetector(
         onLongPress: () =>
-            _afficherPaletteReactions(
+            _afficherActionsCommentaire(
           commentaire,
         ),
+        onHorizontalDragEnd: (details) {
+          final velocity =
+              details.primaryVelocity ?? 0;
+
+          if (velocity > 250) {
+            _repondreAuCommentaire(
+              commentaire,
+            );
+          }
+        },
         child: Row(
           crossAxisAlignment:
               CrossAxisAlignment.start,
@@ -867,25 +1262,94 @@ class _EventDetailScreenState
                       crossAxisAlignment:
                           CrossAxisAlignment.start,
                       children: [
+                        if (parent != null) ...[
+                          Container(
+                            width: double.infinity,
+                            padding:
+                                const EdgeInsets.all(8),
+                            decoration:
+                                BoxDecoration(
+                              color: Colors.white
+                                  .withValues(
+                                alpha: 0.65,
+                              ),
+                              borderRadius:
+                                  BorderRadius.circular(
+                                10,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '↩️ ${parent.nomComplet}',
+                                  style:
+                                      const TextStyle(
+                                    color:
+                                        AppColors.primaryDark,
+                                    fontSize: 12,
+                                    fontWeight:
+                                        FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(
+                                  height: 3,
+                                ),
+                                Text(
+                                  parent.texte,
+                                  maxLines: 2,
+                                  overflow:
+                                      TextOverflow.ellipsis,
+                                  style:
+                                      const TextStyle(
+                                    color:
+                                        AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(
+                            height: 8,
+                          ),
+                        ],
                         Row(
                           crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
+                              CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: Text(
-                                commentaire
-                                    .nomComplet,
-                                style:
-                                    const TextStyle(
-                                  color:
-                                      AppColors
-                                          .textPrimary,
-                                  fontSize: 15,
-                                  fontWeight:
-                                      FontWeight
-                                          .w800,
-                                ),
+                              child: Row(
+                                children: [
+                                  if (commentaire.epingle)
+                                    const Padding(
+                                      padding:
+                                          EdgeInsets.only(
+                                        right: 5,
+                                      ),
+                                      child: Text(
+                                        '📌',
+                                        style:
+                                            TextStyle(
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ),
+                                  Expanded(
+                                    child: Text(
+                                      commentaire.nomComplet,
+                                      style:
+                                          const TextStyle(
+                                        color:
+                                            AppColors.textPrimary,
+                                        fontSize: 15,
+                                        fontWeight:
+                                            FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                             const SizedBox(
@@ -895,8 +1359,7 @@ class _EventDetailScreenState
                               date,
                               style:
                                   const TextStyle(
-                                color:
-                                    Colors.grey,
+                                color: Colors.grey,
                                 fontSize: 11,
                               ),
                             ),
@@ -907,8 +1370,8 @@ class _EventDetailScreenState
                           commentaire.texte,
                           style:
                               const TextStyle(
-                            color: AppColors
-                                .textPrimary,
+                            color:
+                                AppColors.textPrimary,
                             fontSize: 14,
                             height: 1.4,
                           ),
@@ -1731,9 +2194,108 @@ class _EventDetailScreenState
                         CrossAxisAlignment.end,
                     children: [
                       Expanded(
-                        child: TextField(
-                          controller:
-                              _commentaireController,
+                        child: Column(
+                          mainAxisSize:
+                              MainAxisSize.min,
+                          children: [
+                            if (_commentaireEnReponse !=
+                                null)
+                              Container(
+                                width: double.infinity,
+                                margin:
+                                    const EdgeInsets.only(
+                                  bottom: 8,
+                                ),
+                                padding:
+                                    const EdgeInsets
+                                        .symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                decoration:
+                                    BoxDecoration(
+                                  color: AppColors
+                                      .primarySurface,
+                                  borderRadius:
+                                      BorderRadius.circular(
+                                    12,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Text(
+                                      '↩️',
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      width: 8,
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment
+                                                .start,
+                                        children: [
+                                          Text(
+                                            'Réponse à '
+                                            '${_commentaireEnReponse!.nomComplet}',
+                                            maxLines: 1,
+                                            overflow:
+                                                TextOverflow
+                                                    .ellipsis,
+                                            style:
+                                                const TextStyle(
+                                              color:
+                                                  AppColors.primaryDark,
+                                              fontSize: 12,
+                                              fontWeight:
+                                                  FontWeight.w800,
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                            height: 2,
+                                          ),
+                                          Text(
+                                            _commentaireEnReponse!
+                                                .texte,
+                                            maxLines: 1,
+                                            overflow:
+                                                TextOverflow
+                                                    .ellipsis,
+                                            style:
+                                                const TextStyle(
+                                              color:
+                                                  AppColors.textSecondary,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip:
+                                          'Annuler',
+                                      onPressed: () {
+                                        setState(() {
+                                          _commentaireEnReponse =
+                                              null;
+                                        });
+                                      },
+                                      icon: const Icon(
+                                        Icons.close,
+                                        size: 19,
+                                        color:
+                                            AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            TextField(
+                              controller:
+                                  _commentaireController,
                           minLines: 1,
                           maxLines: 4,
                           style:
@@ -1811,6 +2373,8 @@ class _EventDetailScreenState
                           ),
                           onSubmitted: (_) =>
                               _envoyerCommentaire(),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(

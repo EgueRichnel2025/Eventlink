@@ -17,6 +17,10 @@ class CommentModel {
 
   final DateTime createdAt;
 
+  final String? parentCommentId;
+
+  final bool epingle;
+
   final Map<String, int> reactions;
 
   final String? userReaction;
@@ -31,6 +35,8 @@ class CommentModel {
     this.avatarId,
     required this.texte,
     required this.createdAt,
+    this.parentCommentId,
+    this.epingle = false,
     this.reactions = const {},
     this.userReaction,
   });
@@ -60,6 +66,8 @@ class CommentModel {
       createdAt: DateTime.parse(
         json['created_at'] as String,
       ),
+      parentCommentId: json['parent_comment_id'] as String?,
+      epingle: json['epingle'] as bool? ?? false,
       reactions: reactions,
       userReaction: json['user_reaction'] as String?,
     );
@@ -75,6 +83,8 @@ class CommentModel {
     String? avatarId,
     String? texte,
     DateTime? createdAt,
+    String? parentCommentId,
+    bool? epingle,
     Map<String, int>? reactions,
     String? userReaction,
     bool clearUserReaction = false,
@@ -89,6 +99,8 @@ class CommentModel {
       avatarId: avatarId ?? this.avatarId,
       texte: texte ?? this.texte,
       createdAt: createdAt ?? this.createdAt,
+      parentCommentId: parentCommentId ?? this.parentCommentId,
+      epingle: epingle ?? this.epingle,
       reactions: reactions ?? this.reactions,
       userReaction:
           clearUserReaction ? null : userReaction ?? this.userReaction,
@@ -105,6 +117,8 @@ class CommentModel {
         'avatar_id': avatarId,
         'texte': texte,
         'created_at': createdAt.toIso8601String(),
+        'parent_comment_id': parentCommentId,
+        'epingle': epingle,
         'reactions': reactions,
         'user_reaction': userReaction,
       };

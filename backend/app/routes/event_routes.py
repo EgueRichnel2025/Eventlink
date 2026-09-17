@@ -675,6 +675,7 @@ async def ajouter_commentaire(
         ObjectId(event_id),
         user["_id"],
         payload.texte,
+        payload.parent_comment_id,
     )
 
     await notification_service.notifier_membres_groupe(
@@ -819,6 +820,56 @@ async def supprimer_commentaire(
     )
 
     return {"success": True}
+
+
+@router.post(
+    "/events/{event_id}/commentaires/{comment_id}/epingle",
+    response_model=CommentairePublic,
+)
+async def toggle_comment_epingle(
+    event_id: str,
+    comment_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    event = await db.events.find_one(
+        {"_id": ObjectId(event_id)}
+    )
+
+    if event is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Événement introuvable",
+        )
+
+    membership = await db.group_members.find_one(
+        {
+            "group_id": event["group_id"],
+            "user_id": user["_id"],
+        }
+    )
+
+    if membership is None:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Vous n'êtes pas membre de ce groupe",
+        )
+
+    est_admin = membership["role"] in ("admin", "owner")
+
+    if not est_admin:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Seuls les administrateurs ou le propriétaire peuvent épingler un commentaire",
+        )
+
+    commentaire = await event_service.toggle_comment_epingle(
+        db,
+        ObjectId(event_id),
+        ObjectId(comment_id),
+    )
+
+    return CommentairePublic.model_validate(commentaire)
 
 
 @router.post(

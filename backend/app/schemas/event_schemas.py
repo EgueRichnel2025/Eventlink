@@ -72,6 +72,7 @@ class EventPublic(BaseModel):
 
 class CommentaireRequest(BaseModel):
     texte: str = Field(min_length=1, max_length=500)
+    parent_comment_id: PyObjectId | None = None
 
 
 class CommentairePublic(BaseModel):
@@ -84,6 +85,8 @@ class CommentairePublic(BaseModel):
     avatar_id: str | None = None
     texte: str
     created_at: datetime
+    parent_comment_id: PyObjectId | None = None
+    epingle: bool = False
 
     # Réactions du commentaire
     reactions: Dict[str, int] = {}

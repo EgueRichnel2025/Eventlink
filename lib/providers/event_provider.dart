@@ -174,13 +174,15 @@ class EventProvider extends ChangeNotifier {
 
   Future<bool> ajouterCommentaire(
     String eventId,
-    String texte,
-  ) async {
+    String texte, {
+    String? parentCommentId,
+  }) async {
     try {
       final commentaire =
           await _eventService.ajouterCommentaire(
         eventId,
         texte,
+        parentCommentId: parentCommentId,
       );
 
       commentaires = [
@@ -196,6 +198,107 @@ class EventProvider extends ChangeNotifier {
                         e.nombreCommentaires + 1,
                   )
                 : e,
+          )
+          .toList();
+
+      notifyListeners();
+
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> modifierCommentaire({
+    required String eventId,
+    required String commentId,
+    required String texte,
+  }) async {
+    try {
+      final commentaire =
+          await _eventService.modifierCommentaire(
+        eventId,
+        commentId,
+        texte,
+      );
+
+      commentaires = commentaires
+          .map(
+            (commentaireExistant) =>
+                commentaireExistant.id == commentId
+                    ? commentaire
+                    : commentaireExistant,
+          )
+          .toList();
+
+      notifyListeners();
+
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> supprimerCommentaire({
+    required String eventId,
+    required String commentId,
+  }) async {
+    try {
+      await _eventService.supprimerCommentaire(
+        eventId,
+        commentId,
+      );
+
+      commentaires = commentaires
+          .where(
+            (commentaire) => commentaire.id != commentId,
+          )
+          .toList();
+
+      events = events
+          .map(
+            (e) => e.id == eventId
+                ? e.copyWith(
+                    nombreCommentaires:
+                        e.nombreCommentaires > 0
+                            ? e.nombreCommentaires - 1
+                            : 0,
+                  )
+                : e,
+          )
+          .toList();
+
+      notifyListeners();
+
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> toggleCommentEpingle({
+    required String eventId,
+    required String commentId,
+  }) async {
+    try {
+      final commentaire =
+          await _eventService.toggleCommentEpingle(
+        eventId,
+        commentId,
+      );
+
+      commentaires = commentaires
+          .map(
+            (commentaireExistant) =>
+                commentaireExistant.id == commentId
+                    ? commentaire
+                    : commentaireExistant,
           )
           .toList();
 

@@ -169,6 +169,7 @@ async def ajouter_commentaire(
     event_id: ObjectId,
     user_id: ObjectId,
     texte: str,
+    parent_comment_id: ObjectId | None = None,
 ) -> dict:
     user = await db.users.find_one(
         {"_id": user_id}
@@ -186,6 +187,8 @@ async def ajouter_commentaire(
             "avatar_id": user.get("avatar_id"),
             "texte": texte.strip(),
             "created_at": now,
+            "parent_comment_id": parent_comment_id,
+            "epingle": False,
         }
     )
 
@@ -317,6 +320,62 @@ async def lister_commentaires(
         )
 
     return resultats
+
+
+async def toggle_comment_epingle(
+    db: AsyncIOMotorDatabase,
+    event_id: ObjectId,
+    comment_id: ObjectId,
+) -> dict:
+    commentaire = await db.comments.find_one(
+        {
+            "_id": comment_id,
+            "event_id": event_id,
+        }
+    )
+
+    if commentaire is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Commentaire introuvable",
+        )
+
+    epingle = not commentaire.get("epingle", False)
+
+    if epingle:
+        await db.comments.update_many(
+            {
+                "event_id": event_id,
+                "epingle": True,
+                "_id": {"$ne": comment_id},
+            },
+            {
+                "$set": {
+                    "epingle": False,
+                }
+            },
+        )
+
+    await db.comments.update_one(
+        {
+            "_id": comment_id,
+            "event_id": event_id,
+        },
+        {
+            "$set": {
+                "epingle": epingle,
+            }
+        },
+    )
+
+    updated_comment = await db.comments.find_one(
+        {
+            "_id": comment_id,
+            "event_id": event_id,
+        }
+    )
+
+    return updated_comment
 
 
 async def toggle_comment_reaction(

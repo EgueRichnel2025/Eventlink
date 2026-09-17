@@ -122,13 +122,51 @@ class EventService {
 
   Future<CommentModel> ajouterCommentaire(
     String eventId,
-    String texte,
-  ) async {
+    String texte, {
+    String? parentCommentId,
+  }) async {
     final data = await _api.post(
       '/events/$eventId/commentaires',
       body: {
         'texte': texte,
+        if (parentCommentId != null)
+          'parent_comment_id': parentCommentId,
       },
+    ) as Map<String, dynamic>;
+
+    return CommentModel.fromJson(data);
+  }
+
+  Future<CommentModel> modifierCommentaire(
+    String eventId,
+    String commentId,
+    String texte,
+  ) async {
+    final data = await _api.put(
+      '/events/$eventId/commentaires/$commentId',
+      body: {
+        'texte': texte,
+      },
+    ) as Map<String, dynamic>;
+
+    return CommentModel.fromJson(data);
+  }
+
+  Future<void> supprimerCommentaire(
+    String eventId,
+    String commentId,
+  ) async {
+    await _api.delete(
+      '/events/$eventId/commentaires/$commentId',
+    );
+  }
+
+  Future<CommentModel> toggleCommentEpingle(
+    String eventId,
+    String commentId,
+  ) async {
+    final data = await _api.post(
+      '/events/$eventId/commentaires/$commentId/epingle',
     ) as Map<String, dynamic>;
 
     return CommentModel.fromJson(data);
