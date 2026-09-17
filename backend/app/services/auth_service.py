@@ -184,6 +184,47 @@ async def connecter_avec_mot_de_passe(
     return user, access_token, refresh_token
 
 
+
+async def connecter_avec_email_et_mot_de_passe(
+    db: AsyncIOMotorDatabase,
+    email: str,
+    password: str,
+) -> tuple[dict, str, str]:
+    """Authentifie un compte existant avec son adresse email et son mot de passe."""
+
+    email_normalise = normaliser_email(email)
+
+    user = await db.users.find_one(
+        {"email": email_normalise}
+    )
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Adresse email ou mot de passe incorrect.",
+        )
+
+    password_hash = user.get("password_hash")
+
+    if not password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Ce compte doit être sécurisé avec un nouveau mot de passe.",
+        )
+
+    if not verify_secret(password, password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Adresse email ou mot de passe incorrect.",
+        )
+
+    access_token, refresh_token = await emettre_tokens(
+        db,
+        user["_id"],
+    )
+
+    return user, access_token, refresh_token
+
 async def trouver_compte_avec_code(
     db: AsyncIOMotorDatabase,
     account_code: str,

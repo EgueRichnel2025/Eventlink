@@ -75,6 +75,24 @@ class AuthService {
   ///
   /// Cette méthode ne crée aucune session.
   /// Le mot de passe doit ensuite être demandé.
+
+  Future<UserModel> connecterAvecEmail({
+    required String email,
+    required String password,
+  }) async {
+    final data = await _api.post(
+      '/auth/connexion-email',
+      body: {
+        'email': email.trim(),
+        'password': password,
+      },
+      auth: false,
+    ) as Map<String, dynamic>;
+
+    return _enregistrerSessionDepuisReponse(data);
+  }
+
+
   Future<UserModel> trouverCompteAvecCode(
     String accountCode,
   ) async {

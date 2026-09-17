@@ -18,6 +18,11 @@ class ConnexionRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class ConnexionEmailRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
+
+
 class ConnexionCodeRequest(BaseModel):
     account_code: str = Field(min_length=9, max_length=9)
 

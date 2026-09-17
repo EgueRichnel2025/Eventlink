@@ -15,6 +15,7 @@ import '../screens/notifications/notifications_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/auth/account_selection_screen.dart';
+import '../screens/auth/login_screen.dart';
 import '../screens/auth/profil_setup_screen.dart';
 import '../screens/auth/password_recovery/password_recovery_code_screen.dart';
 import '../screens/auth/password_recovery/password_recovery_email_screen.dart';
@@ -46,6 +47,11 @@ class AppRouter {
       case AppRoutes.profilSetup:
         return _page(
           const ProfilSetupScreen(),
+        );
+
+      case AppRoutes.login:
+        return _page(
+          const LoginScreen(),
         );
 
       case AppRoutes.accountSelection:

@@ -8,6 +8,7 @@ from app.database.mongodb import get_database
 from app.schemas.auth_schemas import (
     AccessTokenResponse,
     ConnexionCodeRequest,
+    ConnexionEmailRequest,
     ConnexionRequest,
     CreerProfilRequest,
     DemanderCodeEmailRequest,
@@ -54,6 +55,31 @@ async def creer_profil(
     access_token, refresh_token = await auth_service.emettre_tokens(
         db,
         user["_id"],
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserPublic.model_validate(user),
+    )
+
+
+@router.post(
+    "/connexion-email",
+    response_model=TokenResponse,
+)
+async def connecter_avec_email(
+    payload: ConnexionEmailRequest,
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    """Connecte un compte avec son adresse email et son mot de passe."""
+
+    user, access_token, refresh_token = (
+        await auth_service.connecter_avec_email_et_mot_de_passe(
+            db,
+            payload.email,
+            payload.password,
+        )
     )
 
     return TokenResponse(

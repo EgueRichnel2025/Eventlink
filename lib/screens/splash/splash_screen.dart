@@ -92,7 +92,7 @@ if (!auth.estConnecte) {
     );
   } else {
     Navigator.of(context).pushReplacementNamed(
-      AppRoutes.profilSetup,
+      AppRoutes.login,
     );
   }
 

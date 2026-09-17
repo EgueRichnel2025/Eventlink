@@ -213,6 +213,41 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Demande l'envoi du code de récupération.
+
+  /// Connecte un compte avec son adresse email
+  /// et son mot de passe.
+  Future<bool> connecterAvecEmail({
+    required String email,
+    required String password,
+  }) async {
+    isLoading = true;
+    errorMessage = null;
+
+    notifyListeners();
+
+    try {
+      currentUser =
+          await _authService.connecterAvecEmail(
+        email: email,
+        password: password,
+      );
+
+      status = AuthStatus.connecte;
+
+      await chargerComptesConnus();
+
+      return true;
+    } on ApiException catch (e) {
+      errorMessage = e.message;
+
+      return false;
+    } finally {
+      isLoading = false;
+
+      notifyListeners();
+    }
+  }
+
   Future<bool> demanderCodeRecuperation(
     String email,
   ) async {

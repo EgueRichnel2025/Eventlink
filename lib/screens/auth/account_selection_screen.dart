@@ -506,6 +506,36 @@ class _AccountSelectionScreenState
                           ),
                         ),
                       ),
+                      const SizedBox(
+                        height: 12,
+                      ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton.icon(
+                          onPressed: auth.isLoading
+                              ? null
+                              : () {
+                                  Navigator.of(context)
+                                      .pushNamed(
+                                    AppRoutes.login,
+                                  );
+                                },
+                          icon: const Icon(
+                            Icons.email_outlined,
+                          ),
+                          label: const Text(
+                            'Utiliser une autre adresse email',
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor:
+                                AppColors.primary,
+                            padding:
+                                const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
+                          ),
+                        ),
+                      ),
                       if (!peutCreerCompte) ...[
                         const SizedBox(
                           height: 10,

@@ -7,6 +7,8 @@ class AppRoutes {
 
   static const profilSetup = '/profil-setup';
 
+  static const login = '/login';
+
   static const accountSelection = '/account-selection';
 
   static const passwordRecoveryEmail =
