@@ -670,26 +670,46 @@ async def ajouter_commentaire(
             "Vous n'êtes pas membre de ce groupe",
         )
 
-    mentions = list(
+    mentions_utilisateurs = list(
         dict.fromkeys(
             mention.user_id
             for mention in payload.mentions
+            if mention.mention_type == "user" and mention.user_id is not None
         )
     )
 
-    if mentions:
+    mentions_all = any(
+        mention.mention_type == "all"
+        for mention in payload.mentions
+    )
+
+    if mentions_utilisateurs:
         membres_mentionnes = await db.group_members.count_documents(
             {
                 "group_id": event["group_id"],
-                "user_id": {"$in": mentions},
+                "user_id": {"$in": mentions_utilisateurs},
             }
         )
 
-        if membres_mentionnes != len(mentions):
+        if membres_mentionnes != len(mentions_utilisateurs):
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST,
                 "Un utilisateur mentionné n'est pas membre du groupe",
             )
+
+    mentions = [
+        {
+            "mention_type": "all",
+        }
+    ] if mentions_all else []
+
+    mentions.extend(
+        {
+            "mention_type": "user",
+            "user_id": mention_user_id,
+        }
+        for mention_user_id in mentions_utilisateurs
+    )
 
     commentaire = await event_service.ajouter_commentaire(
         db,

@@ -1,18 +1,22 @@
 class CommentMentionModel {
-  final String userId;
+  final String mentionType;
+  final String? userId;
 
   const CommentMentionModel({
-    required this.userId,
+    this.mentionType = 'user',
+    this.userId,
   });
 
   factory CommentMentionModel.fromJson(Map<String, dynamic> json) {
     return CommentMentionModel(
-      userId: json['user_id']?.toString() ?? '',
+      mentionType: json['mention_type']?.toString() ?? 'user',
+      userId: json['user_id']?.toString(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'user_id': userId,
+        'mention_type': mentionType,
+        if (userId != null) 'user_id': userId,
       };
 }
 

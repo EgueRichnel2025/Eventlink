@@ -71,7 +71,8 @@ class EventPublic(BaseModel):
 
 
 class MentionRequest(BaseModel):
-    user_id: PyObjectId
+    mention_type: str = "user"
+    user_id: PyObjectId | None = None
 
 
 class CommentaireRequest(BaseModel):
@@ -81,7 +82,8 @@ class CommentaireRequest(BaseModel):
 
 
 class MentionPublic(BaseModel):
-    user_id: PyObjectId
+    mention_type: str = "user"
+    user_id: PyObjectId | None = None
 
 
 class CommentairePublic(BaseModel):

@@ -170,7 +170,7 @@ async def ajouter_commentaire(
     user_id: ObjectId,
     texte: str,
     parent_comment_id: ObjectId | None = None,
-    mentions: list[ObjectId] | None = None,
+    mentions: list[dict] | None = None,
 ) -> dict:
     user = await db.users.find_one(
         {"_id": user_id}
@@ -193,8 +193,15 @@ async def ajouter_commentaire(
             "parent_comment_id": parent_comment_id,
             "epingle": False,
             "mentions": [
-                {"user_id": mention_user_id}
-                for mention_user_id in mentions
+                {
+                    "mention_type": mention.get("mention_type", "user"),
+                    **(
+                        {"user_id": mention["user_id"]}
+                        if mention.get("user_id") is not None
+                        else {}
+                    ),
+                }
+                for mention in mentions
             ],
         }
     )

@@ -43,6 +43,7 @@ class _EventDetailScreenState
   String _rechercheMention = '';
   int _positionDebutMention = -1;
   final Map<String, MembreGroupeModel> _mentionsSelectionnees = {};
+  bool _mentionAllSelectionnee = false;
 
   static const List<String> _reactionsDisponibles = [
     '👍',
@@ -144,6 +145,40 @@ class _EventDetailScreenState
     });
   }
 
+  void _selectionnerMentionAll() {
+    final texte = _commentaireController.text;
+    final position = _commentaireController.selection.baseOffset;
+
+    if (_positionDebutMention < 0 ||
+        position < _positionDebutMention ||
+        position > texte.length) {
+      return;
+    }
+
+    final avant = texte.substring(0, _positionDebutMention);
+    final apres = texte.substring(position);
+
+    const insertion = '@all ';
+    final nouveauTexte = '$avant$insertion$apres';
+    final nouvellePosition =
+        (avant + insertion).length;
+
+    _commentaireController.value =
+        TextEditingValue(
+      text: nouveauTexte,
+      selection: TextSelection.collapsed(
+        offset: nouvellePosition,
+      ),
+    );
+
+    setState(() {
+      _mentionAllSelectionnee = true;
+      _afficherSuggestionsMention = false;
+      _rechercheMention = '';
+      _positionDebutMention = -1;
+    });
+  }
+
   Future<void> _charger() async {
     setState(() {
       _chargementEvent = true;
@@ -219,16 +254,25 @@ class _EventDetailScreenState
 
     final events = context.read<EventProvider>();
 
-    final mentions = _mentionsSelectionnees.values
-        .where(
-          (membre) => texte.contains('@${membre.prenom}'),
-        )
-        .map(
-          (membre) => CommentMentionModel(
-            userId: membre.userId,
+    final mentionAllPresente =
+        RegExp(r'(^|\s)@all(?=\s|$)', caseSensitive: false)
+            .hasMatch(texte);
+
+    final mentions = <CommentMentionModel>[
+      if (mentionAllPresente && _mentionAllSelectionnee)
+        const CommentMentionModel(
+          mentionType: 'all',
+        ),
+      ..._mentionsSelectionnees.values
+          .where(
+            (membre) => texte.contains('@${membre.prenom}'),
+          )
+          .map(
+            (membre) => CommentMentionModel(
+              userId: membre.userId,
+            ),
           ),
-        )
-        .toList();
+    ];
 
     final succes =
         await events.ajouterCommentaire(
@@ -251,6 +295,7 @@ class _EventDetailScreenState
       setState(() {
         _commentaireEnReponse = null;
         _mentionsSelectionnees.clear();
+        _mentionAllSelectionnee = false;
         _afficherSuggestionsMention = false;
         _rechercheMention = '';
         _positionDebutMention = -1;
@@ -280,7 +325,10 @@ class _EventDetailScreenState
                 nom.contains(terme);
           }).toList();
 
-    if (membresFiltres.isEmpty) {
+    final afficherMentionAll =
+        terme.isEmpty || 'all'.contains(terme);
+
+    if (membresFiltres.isEmpty && !afficherMentionAll) {
       return const SizedBox.shrink();
     }
 
@@ -310,13 +358,43 @@ class _EventDetailScreenState
         padding: const EdgeInsets.symmetric(
           vertical: 6,
         ),
-        itemCount: membresFiltres.length,
+        itemCount: membresFiltres.length +
+            (afficherMentionAll ? 1 : 0),
         separatorBuilder: (_, __) => Divider(
           height: 1,
           color: Colors.grey.withValues(alpha: 0.10),
         ),
         itemBuilder: (context, index) {
-          final membre = membresFiltres[index];
+          if (afficherMentionAll && index == 0) {
+            return ListTile(
+              dense: true,
+              leading: const CircleAvatar(
+                backgroundColor: AppColors.primary,
+                child: Text(
+                  '📢',
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
+              title: const Text(
+                '@all',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              subtitle: const Text(
+                'Mentionner tout le groupe',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              onTap: _selectionnerMentionAll,
+            );
+          }
+
+          final membre = membresFiltres[
+              afficherMentionAll ? index - 1 : index];
 
           return ListTile(
             dense: true,
