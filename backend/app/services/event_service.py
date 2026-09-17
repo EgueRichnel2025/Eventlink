@@ -519,6 +519,7 @@ async def _to_public_event(
             "prenom": auteur["prenom"],
             "nom": auteur["nom"],
             "photo_url": auteur.get("photo_url"),
+            "avatar_id": auteur.get("avatar_id"),
         }
         if auteur
         else {
@@ -526,6 +527,7 @@ async def _to_public_event(
             "prenom": "?",
             "nom": "",
             "photo_url": None,
+            "avatar_id": None,
         },
         "mon_statut": (
             statut_doc["statut"]
