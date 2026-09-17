@@ -32,7 +32,12 @@ async def client():
 @pytest.mark.asyncio
 async def test_parcours_complet(client: AsyncClient):
     # 1. Création du profil (première utilisation)
-    resp = await client.post("/auth/profil", json={"prenom": "Richnel", "nom": "EGUE"})
+    resp = await client.post("/auth/profil", json={
+        "prenom": "Richnel",
+        "nom": "EGUE",
+        "email": "richnel.test@example.com",
+        "password": "TestPassword123",
+    })
     assert resp.status_code == 201
     data = resp.json()
     token = data["access_token"]
@@ -60,7 +65,12 @@ async def test_parcours_complet(client: AsyncClient):
     assert noms == ["Groupe Aventure", "Groupe INSPEI"]
 
     # 5. Un second utilisateur rejoint le groupe INSPEI via le code
-    resp = await client.post("/auth/profil", json={"prenom": "Alice", "nom": "K."})
+    resp = await client.post("/auth/profil", json={
+        "prenom": "Alice",
+        "nom": "K.",
+        "email": "alice.test@example.com",
+        "password": "TestPassword123",
+    })
     token_alice = resp.json()["access_token"]
     headers_alice = {"Authorization": f"Bearer {token_alice}"}
 
