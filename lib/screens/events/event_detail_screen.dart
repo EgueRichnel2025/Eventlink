@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../config/theme.dart';
 import '../../models/comment_model.dart';
 import '../../models/event_model.dart';
+import '../../models/groupe_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
 import '../../providers/group_provider.dart';
@@ -38,6 +39,11 @@ class _EventDetailScreenState
 
   CommentModel? _commentaireEnReponse;
 
+  bool _afficherSuggestionsMention = false;
+  String _rechercheMention = '';
+  int _positionDebutMention = -1;
+  final Map<String, MembreGroupeModel> _mentionsSelectionnees = {};
+
   static const List<String> _reactionsDisponibles = [
     '👍',
     '❤️',
@@ -50,13 +56,92 @@ class _EventDetailScreenState
   @override
   void initState() {
     super.initState();
+    _commentaireController.addListener(_gererSaisieMention);
     _charger();
   }
 
   @override
   void dispose() {
+    _commentaireController.removeListener(_gererSaisieMention);
     _commentaireController.dispose();
     super.dispose();
+  }
+
+  void _gererSaisieMention() {
+    final texte = _commentaireController.text;
+    final position = _commentaireController.selection.baseOffset;
+
+    if (position < 0 || position > texte.length) return;
+
+    final avantCurseur = texte.substring(0, position);
+    final match = RegExp(r'@([A-Za-zÀ-ÿ0-9_-]*)$').firstMatch(avantCurseur);
+
+    if (match == null) {
+      if (_afficherSuggestionsMention && mounted) {
+        setState(() {
+          _afficherSuggestionsMention = false;
+          _rechercheMention = '';
+          _positionDebutMention = -1;
+        });
+      }
+      return;
+    }
+
+    final recherche = match.group(1) ?? '';
+    final debutMention = match.start;
+
+    if (!mounted) return;
+
+    setState(() {
+      _afficherSuggestionsMention = true;
+      _rechercheMention = recherche;
+      _positionDebutMention = debutMention;
+    });
+
+    final groupProvider = context.read<GroupProvider>();
+    groupProvider.definirRechercheMembres(recherche);
+    groupProvider.chargerMembresDuGroupeCourant(
+      recherche: recherche,
+    );
+  }
+
+  void _selectionnerMention(MembreGroupeModel membre) {
+    final texte = _commentaireController.text;
+    final position = _commentaireController.selection.baseOffset;
+
+    if (_positionDebutMention < 0 ||
+        position < _positionDebutMention ||
+        position > texte.length) {
+      return;
+    }
+
+    final nomMention = membre.prenom.isNotEmpty
+        ? membre.prenom
+        : membre.nom;
+
+    final avant = texte.substring(0, _positionDebutMention);
+    final apres = texte.substring(position);
+
+    final insertion = '@$nomMention ';
+
+    final nouveauTexte = '$avant$insertion$apres';
+    final nouvellePosition =
+        (avant + insertion).length;
+
+    _commentaireController.value =
+        TextEditingValue(
+      text: nouveauTexte,
+      selection: TextSelection.collapsed(
+        offset: nouvellePosition,
+      ),
+    );
+
+    setState(() {
+      _mentionsSelectionnees[membre.userId] = membre;
+      _afficherSuggestionsMention = false;
+      _rechercheMention = '';
+      _positionDebutMention = -1;
+    });
   }
 
   Future<void> _charger() async {
@@ -134,12 +219,24 @@ class _EventDetailScreenState
 
     final events = context.read<EventProvider>();
 
+    final mentions = _mentionsSelectionnees.values
+        .where(
+          (membre) => texte.contains('@${membre.prenom}'),
+        )
+        .map(
+          (membre) => CommentMentionModel(
+            userId: membre.userId,
+          ),
+        )
+        .toList();
+
     final succes =
         await events.ajouterCommentaire(
       widget.eventId,
       texte,
       parentCommentId:
           _commentaireEnReponse?.id,
+      mentions: mentions,
     );
 
     if (!mounted) return;
@@ -153,6 +250,10 @@ class _EventDetailScreenState
 
       setState(() {
         _commentaireEnReponse = null;
+        _mentionsSelectionnees.clear();
+        _afficherSuggestionsMention = false;
+        _rechercheMention = '';
+        _positionDebutMention = -1;
       });
     } else if (events.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -164,6 +265,127 @@ class _EventDetailScreenState
       );
     }
   }
+
+  Widget _construireSuggestionsMention() {
+    final groupProvider = context.watch<GroupProvider>();
+    final membres = groupProvider.membresDuGroupeCourant;
+
+    final terme = _rechercheMention.trim().toLowerCase();
+    final membresFiltres = terme.isEmpty
+        ? membres
+        : membres.where((membre) {
+            final prenom = membre.prenom.toLowerCase();
+            final nom = membre.nom.toLowerCase();
+            return prenom.contains(terme) ||
+                nom.contains(terme);
+          }).toList();
+
+    if (membresFiltres.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      constraints: const BoxConstraints(
+        maxHeight: 220,
+      ),
+      margin: const EdgeInsets.only(
+        bottom: 8,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.grey.withValues(alpha: 0.15),
+        ),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 12,
+            offset: const Offset(0, -3),
+            color: Colors.black.withValues(alpha: 0.08),
+          ),
+        ],
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(
+          vertical: 6,
+        ),
+        itemCount: membresFiltres.length,
+        separatorBuilder: (_, __) => Divider(
+          height: 1,
+          color: Colors.grey.withValues(alpha: 0.10),
+        ),
+        itemBuilder: (context, index) {
+          final membre = membresFiltres[index];
+
+          return ListTile(
+            dense: true,
+            leading: _avatarMembreMention(membre),
+            title: Text(
+              membre.nomComplet,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: Text(
+              '@${membre.prenom}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            onTap: () => _selectionnerMention(membre),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _avatarMembreMention(MembreGroupeModel membre) {
+    if (membre.avatarId != null &&
+        membre.avatarId!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundColor: AppColors.surfaceMuted,
+        backgroundImage: AssetImage(
+          'assets/images/avatars/${membre.avatarId}.jpeg',
+        ),
+      );
+    }
+
+    if (membre.photoUrl != null &&
+        membre.photoUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 20,
+        backgroundColor: AppColors.surfaceMuted,
+        backgroundImage: NetworkImage(
+          membre.photoUrl!,
+        ),
+      );
+    }
+
+    final initiales = '${membre.prenom.isNotEmpty ? membre.prenom[0] : ''}'
+        '${membre.nom.isNotEmpty ? membre.nom[0] : ''}'
+        .toUpperCase();
+
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+      child: Text(
+        initiales,
+        style: const TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
 
   Widget _avatarAuteur(EventModel event) {
     if (event.auteur.avatarId != null &&
@@ -2293,6 +2515,8 @@ class _EventDetailScreenState
                                   ],
                                 ),
                               ),
+                            if (_afficherSuggestionsMention)
+                              _construireSuggestionsMention(),
                             TextField(
                               controller:
                                   _commentaireController,

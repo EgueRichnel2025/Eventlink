@@ -170,12 +170,15 @@ async def ajouter_commentaire(
     user_id: ObjectId,
     texte: str,
     parent_comment_id: ObjectId | None = None,
+    mentions: list[ObjectId] | None = None,
 ) -> dict:
     user = await db.users.find_one(
         {"_id": user_id}
     )
 
     now = datetime.now(timezone.utc)
+
+    mentions = mentions or []
 
     result = await db.comments.insert_one(
         {
@@ -189,6 +192,10 @@ async def ajouter_commentaire(
             "created_at": now,
             "parent_comment_id": parent_comment_id,
             "epingle": False,
+            "mentions": [
+                {"user_id": mention_user_id}
+                for mention_user_id in mentions
+            ],
         }
     )
 

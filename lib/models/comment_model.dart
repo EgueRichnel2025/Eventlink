@@ -1,3 +1,21 @@
+class CommentMentionModel {
+  final String userId;
+
+  const CommentMentionModel({
+    required this.userId,
+  });
+
+  factory CommentMentionModel.fromJson(Map<String, dynamic> json) {
+    return CommentMentionModel(
+      userId: json['user_id']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'user_id': userId,
+      };
+}
+
 class CommentModel {
   final String id;
 
@@ -21,6 +39,8 @@ class CommentModel {
 
   final bool epingle;
 
+  final List<CommentMentionModel> mentions;
+
   final Map<String, int> reactions;
 
   final String? userReaction;
@@ -37,6 +57,7 @@ class CommentModel {
     required this.createdAt,
     this.parentCommentId,
     this.epingle = false,
+    this.mentions = const [],
     this.reactions = const {},
     this.userReaction,
   });
@@ -68,6 +89,13 @@ class CommentModel {
       ),
       parentCommentId: json['parent_comment_id'] as String?,
       epingle: json['epingle'] as bool? ?? false,
+      mentions: (json['mentions'] as List<dynamic>? ?? [])
+          .map(
+            (mention) => CommentMentionModel.fromJson(
+              mention as Map<String, dynamic>,
+            ),
+          )
+          .toList(),
       reactions: reactions,
       userReaction: json['user_reaction'] as String?,
     );
@@ -85,6 +113,7 @@ class CommentModel {
     DateTime? createdAt,
     String? parentCommentId,
     bool? epingle,
+    List<CommentMentionModel>? mentions,
     Map<String, int>? reactions,
     String? userReaction,
     bool clearUserReaction = false,
@@ -101,6 +130,7 @@ class CommentModel {
       createdAt: createdAt ?? this.createdAt,
       parentCommentId: parentCommentId ?? this.parentCommentId,
       epingle: epingle ?? this.epingle,
+      mentions: mentions ?? this.mentions,
       reactions: reactions ?? this.reactions,
       userReaction:
           clearUserReaction ? null : userReaction ?? this.userReaction,
@@ -119,6 +149,7 @@ class CommentModel {
         'created_at': createdAt.toIso8601String(),
         'parent_comment_id': parentCommentId,
         'epingle': epingle,
+        'mentions': mentions.map((mention) => mention.toJson()).toList(),
         'reactions': reactions,
         'user_reaction': userReaction,
       };

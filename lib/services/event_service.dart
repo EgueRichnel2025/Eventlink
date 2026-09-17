@@ -124,6 +124,7 @@ class EventService {
     String eventId,
     String texte, {
     String? parentCommentId,
+    List<CommentMentionModel> mentions = const [],
   }) async {
     final data = await _api.post(
       '/events/$eventId/commentaires',
@@ -131,6 +132,9 @@ class EventService {
         'texte': texte,
         if (parentCommentId != null)
           'parent_comment_id': parentCommentId,
+        'mentions': mentions
+            .map((mention) => mention.toJson())
+            .toList(),
       },
     ) as Map<String, dynamic>;
 

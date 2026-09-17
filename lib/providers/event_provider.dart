@@ -176,6 +176,7 @@ class EventProvider extends ChangeNotifier {
     String eventId,
     String texte, {
     String? parentCommentId,
+    List<CommentMentionModel> mentions = const [],
   }) async {
     try {
       final commentaire =
@@ -183,6 +184,7 @@ class EventProvider extends ChangeNotifier {
         eventId,
         texte,
         parentCommentId: parentCommentId,
+        mentions: mentions,
       );
 
       commentaires = [

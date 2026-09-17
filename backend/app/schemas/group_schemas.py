@@ -32,6 +32,7 @@ class MembreGroupePublic(BaseModel):
     prenom: str
     nom: str
     photo_url: str | None = None
+    avatar_id: str | None = None
     role: str
     joined_at: datetime
 

@@ -70,9 +70,18 @@ class EventPublic(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class MentionRequest(BaseModel):
+    user_id: PyObjectId
+
+
 class CommentaireRequest(BaseModel):
     texte: str = Field(min_length=1, max_length=500)
     parent_comment_id: PyObjectId | None = None
+    mentions: list[MentionRequest] = Field(default_factory=list)
+
+
+class MentionPublic(BaseModel):
+    user_id: PyObjectId
 
 
 class CommentairePublic(BaseModel):
@@ -87,6 +96,7 @@ class CommentairePublic(BaseModel):
     created_at: datetime
     parent_comment_id: PyObjectId | None = None
     epingle: bool = False
+    mentions: list[MentionPublic] = Field(default_factory=list)
 
     # Réactions du commentaire
     reactions: Dict[str, int] = {}
