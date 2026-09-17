@@ -71,4 +71,30 @@ class NotificationProvider extends ChangeNotifier {
       // Une notification qui reste "non lue" faute de réseau n'est pas bloquant.
     }
   }
+
+  Future<void> marquerToutesCommeLues() async {
+    try {
+      await _notificationService.marquerToutesCommeLues();
+
+      notifications = notifications
+          .map(
+            (n) => NotificationModel(
+              id: n.id,
+              userId: n.userId,
+              type: n.type,
+              titre: n.titre,
+              corps: n.corps,
+              data: n.data,
+              lu: true,
+              createdAt: n.createdAt,
+            ),
+          )
+          .toList();
+
+      notifyListeners();
+    } on ApiException {
+      // Si le réseau échoue, on conserve l'état local
+      // afin de ne pas prétendre que les notifications sont lues.
+    }
+  }
 }

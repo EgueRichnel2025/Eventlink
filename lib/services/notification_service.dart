@@ -221,6 +221,11 @@ class NotificationService {
     await _api.patch('/notifications/$notificationId/lu');
   }
 
+  /// Marque toutes les notifications de l'utilisateur comme lues.
+  Future<void> marquerToutesCommeLues() async {
+    await _api.patch('/notifications/lues');
+  }
+
   /// Programme un rappel local pour un événement (fonctionne même sans Firebase).
   Future<void> programmerRappel({
     required int id,

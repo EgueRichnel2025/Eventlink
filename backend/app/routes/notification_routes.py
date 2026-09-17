@@ -22,7 +22,11 @@ async def enregistrer_token(
     user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    await notification_service.enregistrer_token(db, user["_id"], payload.fcm_token)
+    await notification_service.enregistrer_token(
+        db,
+        user["_id"],
+        payload.fcm_token,
+    )
     return {"success": True}
 
 
@@ -31,7 +35,14 @@ async def mes_notifications(
     user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
-    notifs = await db.notifications.find({"user_id": user["_id"]}).sort("created_at", -1).to_list(length=200)
+    notifs = (
+        await db.notifications.find(
+            {"user_id": user["_id"]}
+        )
+        .sort("created_at", -1)
+        .to_list(length=200)
+    )
+
     for n in notifs:
         n["_id"] = str(n["_id"])
         n["user_id"] = str(n["user_id"])
@@ -59,6 +70,38 @@ async def marquer_lu(
     db: AsyncIOMotorDatabase = Depends(get_database),
 ):
     await db.notifications.update_one(
-        {"_id": ObjectId(notification_id), "user_id": user["_id"]}, {"$set": {"lu": True}}
+        {
+            "_id": ObjectId(notification_id),
+            "user_id": user["_id"],
+        },
+        {
+            "$set": {
+                "lu": True,
+            }
+        },
     )
+
     return {"success": True}
+
+
+@router.patch("/lues", response_model=dict)
+async def marquer_toutes_lues(
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    resultat = await db.notifications.update_many(
+        {
+            "user_id": user["_id"],
+            "lu": {"$ne": True},
+        },
+        {
+            "$set": {
+                "lu": True,
+            }
+        },
+    )
+
+    return {
+        "success": True,
+        "modified_count": resultat.modified_count,
+    }
