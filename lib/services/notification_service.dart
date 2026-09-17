@@ -37,12 +37,18 @@ class NotificationService {
   NotificationService({ApiService? api}) : _api = api ?? ApiService();
 
   /// À appeler une fois au démarrage de l'app (après runApp). N'échoue jamais.
-  Future<void> initialiser() async {
-    await _initFirebaseEnDouceur();
+  Future<void> initialiser({
+    Future<void> Function()? onNotificationReceived,
+  }) async {
+    await _initFirebaseEnDouceur(
+      onNotificationReceived: onNotificationReceived,
+    );
     await _initNotificationsLocales();
   }
 
-  Future<void> _initFirebaseEnDouceur() async {
+  Future<void> _initFirebaseEnDouceur({
+    Future<void> Function()? onNotificationReceived,
+  }) async {
     try {
       // Firebase est déjà initialisé dans main.dart.
       // Cette vérification évite une double initialisation.
@@ -56,7 +62,24 @@ class NotificationService {
 
       await messaging.requestPermission();
 
-      FirebaseMessaging.onMessage.listen(_gererMessagePremierPlan);
+      FirebaseMessaging.onMessage.listen(
+        (message) async {
+          await _gererMessagePremierPlan(message);
+
+          // Le backend a déjà enregistré la notification.
+          // On recharge simplement la liste pour actualiser le badge.
+          if (onNotificationReceived != null) {
+            try {
+              await onNotificationReceived();
+            } catch (e) {
+              developer.log(
+                'Impossible de recharger les notifications après réception FCM: $e',
+                name: 'NotificationService',
+              );
+            }
+          }
+        },
+      );
 
       messaging.onTokenRefresh.listen(_enregistrerTokenAuBackend);
 

@@ -19,7 +19,9 @@ class NotificationProvider extends ChangeNotifier {
 
   Future<void> initialiser() async {
     // N'échoue jamais, même si Firebase n'est pas configuré.
-    await _notificationService.initialiser();
+    await _notificationService.initialiser(
+      onNotificationReceived: chargerNotifications,
+    );
   }
 
   /// Enregistre le token FCM une fois que l'utilisateur possède
