@@ -410,7 +410,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     horizontal: 12,
                                   ),
                                   child: Text(
-                                    'Nouveau sur EventLink ?',
+                                    "Vous n'avez pas encore de compte EventLink ?",
                                     style: TextStyle(
                                       color: Colors.white
                                           .withValues(alpha: 0.7),

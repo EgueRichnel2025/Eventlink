@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/theme.dart';
 import '../../services/storage_service.dart';
-import '../../providers/auth_provider.dart';
-import 'package:provider/provider.dart';
 import 'onboarding_page_1.dart';
 import 'onboarding_page_2.dart';
 import 'onboarding_page_3.dart';
@@ -37,21 +35,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // Mark onboarding as completed
     await _markOnboardingCompleted();
     if (!mounted) return;
-    // Check if user already has a profile
-    final auth = context.read<AuthProvider>();
-    final hasProfile = await auth.hasProfile();
-
-    if (!mounted) return;
 
     setState(() => _isLoading = false);
 
-    if (hasProfile) {
-      // User has profile, go to group choice
-      Navigator.of(context).pushReplacementNamed('/groupe-choice');
-    } else {
-      // User needs to create profile
-      Navigator.of(context).pushReplacementNamed('/profil-setup');
-    }
+    // After onboarding, always continue to the profile setup screen.
+    // Authentication/session routing is handled by the splash screen.
+    Navigator.of(context).pushReplacementNamed('/profil-setup');
   }
 
   @override

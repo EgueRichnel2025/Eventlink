@@ -1262,6 +1262,36 @@ class _ProfilSetupScreenState extends State<ProfilSetupScreen> {
                                     const SizedBox(
                                       height: AppSpacing.md,
                                     ),
+                                    Text(
+                                      'Avez-vous déjà un compte EventLink ?',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.8,
+                                        ),
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      height: 6,
+                                    ),
+                                    TextButton(
+                                      onPressed: _isLoading
+                                          ? null
+                                          : () {
+                                              Navigator.of(context)
+                                                  .pushNamed(
+                                                AppRoutes.login,
+                                              );
+                                            },
+                                      child: const Text(
+                                        'Connectez-vous',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
