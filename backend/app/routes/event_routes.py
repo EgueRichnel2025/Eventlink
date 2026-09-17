@@ -733,6 +733,16 @@ async def ajouter_commentaire(
         },
     )
 
+
+    await notification_service.notifier_mentions_commentaire(
+        db,
+        group_id=event["group_id"],
+        auteur_id=user["_id"],
+        event_id=ObjectId(event_id),
+        comment_id=commentaire["_id"],
+        mentions=mentions,
+    )
+
     return CommentairePublic.model_validate(commentaire)
 
 

@@ -101,6 +101,92 @@ async def _envoyer_push(db: AsyncIOMotorDatabase, user_id: ObjectId, titre: str,
     except Exception as exc:  # noqa: BLE001 - un échec d'envoi ne doit jamais casser la requête
         logger.warning("Échec d'envoi FCM pour %s: %s", user_id, exc)
 
+async def notifier_mentions_commentaire(
+    db: AsyncIOMotorDatabase,
+    group_id: ObjectId,
+    auteur_id: ObjectId,
+    event_id: ObjectId,
+    comment_id: ObjectId,
+    mentions: list[dict] | None = None,
+) -> None:
+    """Notifie les utilisateurs mentionnés dans un commentaire.
+
+    - Une mention individuelle cible uniquement l'utilisateur mentionné.
+    - @all cible tous les membres du groupe.
+    - L'auteur du commentaire est toujours exclu.
+    - Les utilisateurs sont dédupliqués.
+    - La notification est persistée en base et envoyée via FCM si disponible.
+    """
+    mentions = mentions or []
+
+    utilisateurs_a_notifier: set[ObjectId] = set()
+    mention_all = False
+
+    for mention in mentions:
+        mention_type = mention.get("mention_type", "user")
+
+        if mention_type == "all":
+            mention_all = True
+            continue
+
+        user_id = mention.get("user_id")
+        if user_id is not None:
+            utilisateurs_a_notifier.add(user_id)
+
+    if mention_all:
+        memberships = await db.group_members.find(
+            {"group_id": group_id}
+        ).to_list(length=None)
+
+        utilisateurs_a_notifier.update(
+            membre["user_id"]
+            for membre in memberships
+        )
+
+    utilisateurs_a_notifier.discard(auteur_id)
+
+    if not utilisateurs_a_notifier:
+        return
+
+    now = datetime.now(timezone.utc)
+
+    for user_id in utilisateurs_a_notifier:
+        if mention_all:
+            titre = "Vous avez été mentionné"
+            corps = "Vous avez été mentionné dans une conversation de groupe."
+        else:
+            titre = "Vous avez été mentionné"
+            corps = "Vous avez été mentionné dans un commentaire."
+
+        data = {
+            "event_id": str(event_id),
+            "group_id": str(group_id),
+            "comment_id": str(comment_id),
+            "mention_type": "all" if mention_all else "user",
+        }
+
+        await db.notifications.insert_one(
+            {
+                "user_id": user_id,
+                "type": "mention_commentaire",
+                "titre": titre,
+                "corps": corps,
+                "data": data,
+                "lu": False,
+                "created_at": now,
+            }
+        )
+
+        if _firebase_available:
+            await _envoyer_push(
+                db,
+                user_id,
+                titre,
+                corps,
+                data,
+            )
+
+
 async def notifier_suppression_evenement(
     db: AsyncIOMotorDatabase,
     auteur_id: ObjectId,
